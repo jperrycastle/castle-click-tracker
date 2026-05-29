@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Castle Click — Upload Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --surface: #ffffff;
+      --surface2: #f0f2f8;
+      --border: #dde1ee;
+      --accent: #3b6ff0;
+      --accent2: #7c5ce8;
+      --green: #0ea86b;
+      --red: #e03e3e;
+      --text: #1a1d2e;
+      --muted: #7b82a0;
+      --mono: 'DM Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(59,111,240,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(124,92,232,0.05) 0%, transparent 60%);
+    }
+
+    header {
+      padding: 2rem 2.5rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .logo-area h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    .logo-area h1 span {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .logo-area p {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .stats {
+      display: flex;
+      gap: 1.25rem;
+    }
+
+    .stat {
+      text-align: right;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .stat-value.green { color: var(--green); }
+    .stat-value.red { color: var(--red); }
+    .stat-value.blue { color: var(--accent); }
+
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-top: 0.2rem;
+    }
+
+    main {
+      padding: 2rem 2.5rem;
+      max-width: 1200px;
+    }
+
+    /* --- Form --- */
+    .form-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      margin-bottom: 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .form-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+
+    .form-card h2 {
+      font-size: 0.8rem;
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr auto;
+      gap: 0.75rem;
+      align-items: end;
+    }
+
+    .field label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.4rem;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 0.6rem 0.85rem;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 0.88rem;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    .field input:focus,
+    .field select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(91,138,245,0.12);
+    }
+
+    .field select option { background: var(--surface2); }
+
+    button.add-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      border: none;
+      border-radius: 7px;
+      padding: 0.62rem 1.4rem;
+      font-family: var(--sans);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    button.add-btn:hover { opacity: 0.9; }
+    button.add-btn:active { transform: scale(0.97); }
+    button.add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* --- Table --- */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .table-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .table-header h2 {
+      font-size: 0.8rem;
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-wrap input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 0.45rem 0.85rem 0.45rem 2rem;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      outline: none;
+      width: 200px;
+      transition: border-color 0.2s;
+    }
+
+    .search-wrap input:focus { border-color: var(--accent); }
+
+    .search-wrap svg {
+      position: absolute;
+      left: 0.6rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead th {
+      padding: 0.75rem 1.25rem;
+      text-align: left;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(59,111,240,0.04); }
+
+    tbody td {
+      padding: 0.85rem 1.25rem;
+      font-size: 0.9rem;
+    }
+
+    td.vendor {
+      font-weight: 600;
+    }
+
+    td.date {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: #6b7280;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 0.3rem 0.7rem;
+      border-radius: 99px;
+      letter-spacing: 0.05em;
+    }
+
+    .badge.yes {
+      background: rgba(52,211,153,0.1);
+      color: var(--green);
+      border: 1px solid rgba(52,211,153,0.2);
+    }
+
+    .badge.no {
+      background: rgba(248,113,113,0.1);
+      color: var(--red);
+      border: 1px solid rgba(248,113,113,0.2);
+    }
+
+    .badge.pending {
+      background: rgba(107,114,128,0.1);
+      color: var(--muted);
+      border: 1px solid rgba(107,114,128,0.2);
+    }
+
+    .del-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0.3rem;
+      border-radius: 5px;
+      transition: color 0.15s, background 0.15s;
+      display: flex;
+    }
+
+    .del-btn:hover { color: var(--red); background: rgba(248,113,113,0.08); }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--muted);
+    }
+
+    .empty-state svg { margin-bottom: 1rem; opacity: 0.3; }
+    .empty-state p { font-family: var(--mono); font-size: 0.8rem; }
+
+    .loading {
+      text-align: center;
+      padding: 3rem;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1.25rem;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--text);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      z-index: 100;
+    }
+
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error { border-left: 3px solid var(--red); }
+
+    /* Config banner */
+    .config-banner {
+      background: rgba(91,138,245,0.08);
+      border: 1px solid rgba(91,138,245,0.2);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      line-height: 1.7;
+      color: #a0aec0;
+    }
+
+    .config-banner strong { color: var(--accent); }
+    .config-banner code {
+      background: var(--surface2);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      color: var(--accent2);
+    }
+
+    @media (max-width: 768px) {
+      header { padding: 1.25rem 1rem; }
+      main { padding: 1.25rem 1rem; }
+      .form-grid { grid-template-columns: 1fr 1fr; }
+      .form-grid .field:first-child { grid-column: 1 / -1; }
+      .form-grid button { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-area">
+    <h1>Castle <span>Click</span></h1>
+    <p>Upload Tracker &nbsp;·&nbsp; Internal Tool</p>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value blue" id="stat-total">—</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value green" id="stat-success">—</div>
+      <div class="stat-label">Success</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value red" id="stat-failed">—</div>
+      <div class="stat-label">Failed</div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+
+
+  <!-- Add record form -->
+  <div class="form-card">
+    <h2>// Add Upload Record</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label>Vendor Name</label>
+        <input type="text" id="f-vendor" placeholder="e.g. Acme Corp" />
+      </div>
+      <div class="field">
+        <label>Date Received</label>
+        <input type="date" id="f-received" />
+      </div>
+      <div class="field">
+        <label>Date Uploaded</label>
+        <input type="date" id="f-uploaded" />
+      </div>
+      <div class="field">
+        <label>Upload Successful?</label>
+        <select id="f-success">
+          <option value="">— Select —</option>
+          <option value="yes">✅ Yes</option>
+          <option value="no">❌ No</option>
+          <option value="pending">⏳ Pending</option>
+        </select>
+      </div>
+      <button class="add-btn" id="add-btn" onclick="addRecord()">Add</button>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <div class="table-header">
+      <h2>// Upload Log</h2>
+      <div class="search-wrap">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="text" id="search" placeholder="Search vendor..." oninput="filterTable()" />
+      </div>
+    </div>
+    <div id="table-container">
+      <div class="loading">Loading records...</div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<!-- =====================================================
+     FIREBASE CONFIG — Replace with your own values!
+     Go to console.firebase.google.com → Your project →
+     Project Settings → Your apps → SDK setup & config
+     ===================================================== -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    getDocs,
+    deleteDoc,
+    doc,
+    query,
+    orderBy,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDGfLmEZWJJdXwgDxsph0BQqeUHpeum6xM",
+    authDomain:        "castle-click-tracker.firebaseapp.com",
+    projectId:         "castle-click-tracker",
+    storageBucket:     "castle-click-tracker.firebasestorage.app",
+    messagingSenderId: "499568518560",
+    appId:             "1:499568518560:web:fc23f2a2085edeeffe30c5",
+    measurementId:     "G-312T70037D"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+  const COL = "uploads";
+
+  let allRecords = [];
+
+  // ── Load records ──────────────────────────────────────
+  async function loadRecords() {
+    try {
+      const q = query(collection(db, COL), orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
+      allRecords = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderTable(allRecords);
+      updateStats(allRecords);
+    } catch (e) {
+      document.getElementById("table-container").innerHTML =
+        `<div class="empty-state"><p>⚠️ Could not connect to Firebase. Check your config.</p></div>`;
+    }
+  }
+
+  // ── Add record ────────────────────────────────────────
+  window.addRecord = async function () {
+    const vendor   = document.getElementById("f-vendor").value.trim();
+    const received = document.getElementById("f-received").value;
+    const uploaded = document.getElementById("f-uploaded").value;
+    const success  = document.getElementById("f-success").value;
+
+    if (!vendor) return showToast("Vendor name is required", "error");
+    if (!received) return showToast("Date received is required", "error");
+
+    const btn = document.getElementById("add-btn");
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+
+    try {
+      await addDoc(collection(db, COL), {
+        vendor, received, uploaded, success,
+        createdAt: serverTimestamp()
+      });
+      document.getElementById("f-vendor").value   = "";
+      document.getElementById("f-received").value = "";
+      document.getElementById("f-uploaded").value = "";
+      document.getElementById("f-success").value  = "";
+      showToast("Record added ✓", "success");
+      await loadRecords();
+    } catch (e) {
+      showToast("Error saving record", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Add";
+    }
+  };
+
+  // ── Delete record ─────────────────────────────────────
+  window.deleteRecord = async function (id) {
+    if (!confirm("Delete this record?")) return;
+    try {
+      await deleteDoc(doc(db, COL, id));
+      showToast("Record deleted", "success");
+      await loadRecords();
+    } catch {
+      showToast("Error deleting", "error");
+    }
+  };
+
+  // ── Filter ────────────────────────────────────────────
+  window.filterTable = function () {
+    const q = document.getElementById("search").value.toLowerCase();
+    const filtered = allRecords.filter(r => r.vendor?.toLowerCase().includes(q));
+    renderTable(filtered);
+  };
+
+  // ── Render table ──────────────────────────────────────
+  function renderTable(records) {
+    const container = document.getElementById("table-container");
+    if (!records.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+          </svg>
+          <p>No records yet. Add one above.</p>
+        </div>`;
+      return;
+    }
+
+    const rows = records.map(r => {
+      const badge = r.success === "yes"
+        ? `<span class="badge yes">✓ Yes</span>`
+        : r.success === "no"
+        ? `<span class="badge no">✗ No</span>`
+        : `<span class="badge pending">⏳ Pending</span>`;
+
+      return `<tr>
+        <td class="vendor">${esc(r.vendor)}</td>
+        <td class="date">${r.received || '—'}</td>
+        <td class="date">${r.uploaded || '—'}</td>
+        <td>${badge}</td>
+        <td>
+          <button class="del-btn" onclick="deleteRecord('${r.id}')" title="Delete">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+              <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+            </svg>
+          </button>
+        </td>
+      </tr>`;
+    }).join("");
+
+    container.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Vendor Name</th>
+            <th>Date Received</th>
+            <th>Date Uploaded</th>
+            <th>Upload Successful?</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  function updateStats(records) {
+    document.getElementById("stat-total").textContent   = records.length;
+    document.getElementById("stat-success").textContent = records.filter(r => r.success === "yes").length;
+    document.getElementById("stat-failed").textContent  = records.filter(r => r.success === "no").length;
+  }
+
+  function esc(str) {
+    return (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function showToast(msg, type = "success") {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.className = `toast ${type} show`;
+    setTimeout(() => t.className = "toast", 2800);
+  }
+
+  loadRecords();
+</script>
+</body>
+</html>
