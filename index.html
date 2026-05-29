@@ -128,7 +128,7 @@
 
     .form-grid {
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr 1fr auto;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
       gap: 0.75rem;
       align-items: end;
     }
@@ -424,6 +424,10 @@
         <input type="text" id="f-vendor" placeholder="e.g. Acme Corp" />
       </div>
       <div class="field">
+        <label>Invoice #</label>
+        <input type="text" id="f-invoice" placeholder="e.g. INV-1234" />
+      </div>
+      <div class="field">
         <label>Date Received</label>
         <input type="date" id="f-received" />
       </div>
@@ -515,6 +519,7 @@
   // ── Add record ────────────────────────────────────────
   window.addRecord = async function () {
     const vendor   = document.getElementById("f-vendor").value.trim();
+    const invoice  = document.getElementById("f-invoice").value.trim();
     const received = document.getElementById("f-received").value;
     const uploaded = document.getElementById("f-uploaded").value;
     const success  = document.getElementById("f-success").value;
@@ -528,10 +533,11 @@
 
     try {
       await addDoc(collection(db, COL), {
-        vendor, received, uploaded, success,
+        vendor, invoice, received, uploaded, success,
         createdAt: serverTimestamp()
       });
       document.getElementById("f-vendor").value   = "";
+      document.getElementById("f-invoice").value  = "";
       document.getElementById("f-received").value = "";
       document.getElementById("f-uploaded").value = "";
       document.getElementById("f-success").value  = "";
@@ -589,6 +595,7 @@
 
       return `<tr>
         <td class="vendor">${esc(r.vendor)}</td>
+        <td class="date">${esc(r.invoice) || '—'}</td>
         <td class="date">${r.received || '—'}</td>
         <td class="date">${r.uploaded || '—'}</td>
         <td>${badge}</td>
@@ -608,6 +615,7 @@
         <thead>
           <tr>
             <th>Vendor Name</th>
+            <th>Invoice #</th>
             <th>Date Received</th>
             <th>Date Uploaded</th>
             <th>Upload Successful?</th>
