@@ -333,14 +333,15 @@
     <div class="card-title">// Upload Log</div>
     <!-- Filter bar -->
     <div class="filter-bar">
-      <label>Filter by Month:</label>
+      <input id="filter-search" type="text" placeholder="🔍 Search vendor..." oninput="applyFilter()" style="min-width:180px;width:auto;" />
+      <label style="margin-left:6px;">Month:</label>
       <select id="filter-month" onchange="applyFilter()">
-        <option value="">— All Months —</option>
+        <option value="">— All —</option>
       </select>
       <select id="filter-year" onchange="applyFilter()">
         <option value="">— All Years —</option>
       </select>
-      <button class="btn-clear" onclick="clearFilter()">Clear Filter</button>
+      <button class="btn-clear" onclick="clearFilter()">Clear</button>
       <span class="filter-count" id="filter-count"></span>
     </div>
     <div class="table-wrap">
@@ -491,29 +492,35 @@
 
   // ── Apply filter ─────────────────────────────────────────────
   window.applyFilter = () => {
-    const month = document.getElementById("filter-month").value;
-    const year  = document.getElementById("filter-year").value;
+    const month  = document.getElementById("filter-month").value;
+    const year   = document.getElementById("filter-year").value;
+    const search = document.getElementById("filter-search").value.trim().toLowerCase();
 
-    let filtered = allRecords;
-    if (month || year) {
-      filtered = allRecords.filter(r => {
+    let filtered = allRecords.filter(r => {
+      // Vendor search
+      if (search) {
+        const vendor = (r.vendorName || r.vendor || r.Vendor || r.VendorName || "").toLowerCase();
+        if (!vendor.includes(search)) return false;
+      }
+      // Month/year filter
+      if (month || year) {
         const d = getRecordDate(r);
         if (!d) return false;
         const [y, m] = d.split("-");
         if (year  && y !== year)  return false;
         if (month && m !== month) return false;
-        return true;
-      });
-    }
+      }
+      return true;
+    });
 
     renderTable(filtered);
     renderStats(filtered);
 
     const countEl = document.getElementById("filter-count");
-    if (month || year) {
+    if (search || month || year) {
       const mName = month ? MONTHS[parseInt(month)-1] : "";
-      const label = [mName, year].filter(Boolean).join(" ");
-      countEl.textContent = `Showing ${filtered.length} record${filtered.length!==1?"s":""} for ${label}`;
+      const parts = [search ? `"${search}"` : "", mName, year].filter(Boolean).join(" ");
+      countEl.textContent = `Showing ${filtered.length} record${filtered.length!==1?"s":""} ${parts ? "for " + parts : ""}`;
     } else {
       countEl.textContent = "";
     }
@@ -521,8 +528,9 @@
 
   // ── Clear filter ─────────────────────────────────────────────
   window.clearFilter = () => {
-    document.getElementById("filter-month").value = "";
-    document.getElementById("filter-year").value  = "";
+    document.getElementById("filter-search").value = "";
+    document.getElementById("filter-month").value  = "";
+    document.getElementById("filter-year").value   = "";
     applyFilter();
   };
 
