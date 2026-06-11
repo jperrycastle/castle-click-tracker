@@ -1,90 +1,644 @@
-# Castle Click — Upload Tracker
-
-A lightweight internal web app to track vendor uploads to Castle Click.
-Hosted on **Netlify**, database powered by **Firebase Firestore**.
-
----
-
-## Setup (15 minutes)
-
-### Step 1 — Create a Firebase Project
-
-1. Go to https://console.firebase.google.com
-2. Click **Add project** → give it a name (e.g. `castle-click-tracker`)
-3. Disable Google Analytics if you don't need it → **Create project**
-
-### Step 2 — Create a Firestore Database
-
-1. In the left sidebar click **Firestore Database** → **Create database**
-2. Choose **Start in test mode** (you can lock it down later)
-3. Pick a region close to you (e.g. `us-central`) → **Enable**
-
-### Step 3 — Register a Web App & Get Config
-
-1. In Project Overview click the **</>** (web) icon → give it a name
-2. Copy the `firebaseConfig` object that appears — it looks like:
-
-```js
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abc123"
-};
-```
-
-3. Open `index.html` and find the section marked `// ── REPLACE THESE VALUES ──`
-4. Paste your values in
-5. Delete the `<div class="config-banner">` block at the top of `<main>`
-
-### Step 4 — Deploy to Netlify
-
-1. Push this folder to a **GitHub repository**
-2. Go to https://app.netlify.com → **Add new site → Import from Git**
-3. Connect your GitHub account → select the repo
-4. Build settings:
-   - Build command: *(leave blank)*
-   - Publish directory: `.`
-5. Click **Deploy site**
-
-Netlify will give you a URL like `https://your-site-name.netlify.app` — share that with your team!
-
-### Step 5 — (Optional) Custom Domain
-
-In Netlify → **Domain management** → add your own domain if you have one.
-
----
-
-## Security Note
-
-The Firebase config values (API key etc.) are safe to expose in client-side code —
-Firebase's security is controlled by **Firestore Security Rules**, not by keeping
-the config secret.
-
-Once you're ready to lock down access (so only your team can use it), update your
-Firestore rules in the Firebase Console under **Firestore → Rules**:
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /uploads/{doc} {
-      allow read, write: if request.auth != null;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CastleDrop — Upload Tracker</title>
+  <style>
+    :root {
+      --bg:        #f5f5f5;
+      --surface:   #ffffff;
+      --border:    #e0e0e0;
+      --gold:      #b8860b;
+      --gold-light:#d4a017;
+      --text:      #1a1a1a;
+      --muted:     #666666;
+      --green:     #1a7a3c;
+      --red:       #c0392b;
+      --yellow:    #b7791f;
+      --accent:    #b8860b;
+      --radius:    8px;
     }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding-bottom: 60px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 2px solid var(--border);
+      padding: 22px 36px;
+    }
+    .brand-name {
+      font-size: 1.7rem;
+      font-weight: 800;
+      color: var(--gold);
+      letter-spacing: -.5px;
+      line-height: 1;
+    }
+    .brand-sub {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-top: 3px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+    .brand-tag {
+      font-size: .7rem;
+      color: var(--muted);
+      margin-top: 2px;
+      font-style: italic;
+    }
+
+    /* ── Stats bar ── */
+    .stats {
+      display: flex;
+      gap: 14px;
+      padding: 20px 36px;
+      flex-wrap: wrap;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 22px;
+      min-width: 120px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .stat-label {
+      font-size: .68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .stat-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-top: 3px;
+      color: var(--text);
+    }
+    .stat-value.green   { color: var(--green); }
+    .stat-value.red     { color: var(--red);   }
+    .stat-value.yellow  { color: var(--yellow);}
+    .stat-value.gold    { color: var(--gold);  }
+
+    /* ── Main ── */
+    .main { padding: 0 36px; display: flex; flex-direction: column; gap: 24px; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .card-title {
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--gold);
+      margin-bottom: 18px;
+      font-weight: 700;
+    }
+
+    /* ── Form ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .form-full { grid-column: 1 / -1; }
+    label { display: block; font-size: .75rem; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
+    input, select, textarea {
+      width: 100%;
+      background: #fafafa;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      padding: 9px 11px;
+      font-size: .875rem;
+      font-family: inherit;
+      transition: border-color .2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--gold);
+      background: #fff;
+    }
+    textarea { resize: vertical; min-height: 68px; }
+
+    .form-actions { display: flex; gap: 10px; }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      font-size: .85rem;
+      font-weight: 600;
+      padding: 9px 22px;
+      font-family: inherit;
+      transition: opacity .15s, box-shadow .15s;
+    }
+    button:hover { opacity: .88; }
+    .btn-primary { background: var(--gold); color: #fff; }
+    .btn-cancel  { background: #e8e8e8; color: var(--muted); }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+    thead th {
+      text-align: left;
+      padding: 10px 13px;
+      font-size: .67rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+      font-weight: 700;
+      background: #fafafa;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+    tbody tr:hover { background: #fdf8ee; }
+    tbody td { padding: 11px 13px; vertical-align: top; color: var(--text); }
+    .td-note   { color: var(--muted); font-size: .78rem; font-style: italic; max-width: 200px; }
+    .td-amount { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .td-vendor { font-weight: 600; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: .73rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge-yes     { background: #e6f4ec; color: var(--green); border: 1px solid #b7dfc6; }
+    .badge-no      { background: #fdecea; color: var(--red);   border: 1px solid #f5c0bb; }
+    .badge-pending { background: #fef3dc; color: var(--yellow); border: 1px solid #f5dfa0; }
+
+    /* ── Row actions ── */
+    .row-actions { display: flex; gap: 6px; }
+    .btn-edit   { background: #eef1fb; color: #3a5bc7; padding: 5px 11px; font-size: .73rem; border: 1px solid #c7d0f0; }
+    .btn-delete { background: #fdecea; color: var(--red);  padding: 5px 11px; font-size: .73rem; border: 1px solid #f5c0bb; }
+
+    /* ── Empty ── */
+    .empty { text-align: center; padding: 48px 24px; color: var(--muted); }
+    .empty .icon { font-size: 2.4rem; margin-bottom: 10px; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.35);
+      backdrop-filter: blur(3px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      width: min(520px, 94vw);
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,.15);
+    }
+    .modal h2 {
+      font-size: 1rem;
+      margin-bottom: 20px;
+      color: var(--gold);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .filter-bar label { margin-bottom: 0; white-space: nowrap; }
+    .filter-bar select { width: auto; min-width: 150px; }
+    .btn-clear {
+      background: #e8e8e8;
+      color: var(--muted);
+      padding: 8px 16px;
+      font-size: .8rem;
+      border: 1px solid var(--border);
+    }
+    .filter-count {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-left: auto;
+      font-style: italic;
+    }
+
+    @media (max-width: 600px) {
+      header, .stats, .main { padding-left: 16px; padding-right: 16px; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand-name">CastleDrop</div>
+  <div class="brand-sub">Upload Tracker</div>
+  <div class="brand-tag">Internal Use Only</div>
+</header>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-label">Total</div>
+    <div class="stat-value gold" id="stat-total">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Success</div>
+    <div class="stat-value green" id="stat-yes">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Failed</div>
+    <div class="stat-value red" id="stat-no">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Pending</div>
+    <div class="stat-value yellow" id="stat-pending">—</div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Add form -->
+  <div class="card">
+    <div class="card-title">// Add Upload Record</div>
+    <div class="form-grid">
+      <div>
+        <label>Vendor Name</label>
+        <input id="f-vendor" type="text" placeholder="ACME Corp" />
+      </div>
+      <div>
+        <label>Invoice #</label>
+        <input id="f-invoice" type="text" placeholder="INV-0001" />
+      </div>
+      <div>
+        <label>Amount ($)</label>
+        <input id="f-amount" type="number" placeholder="0.00" step="0.01" min="0" />
+      </div>
+      <div>
+        <label>Date Received</label>
+        <input id="f-received" type="date" />
+      </div>
+      <div>
+        <label>Date Uploaded</label>
+        <input id="f-uploaded" type="date" />
+      </div>
+      <div>
+        <label>Upload Successful?</label>
+        <select id="f-status">
+          <option value="">— Select —</option>
+          <option value="yes">✅ Yes</option>
+          <option value="no">❌ No</option>
+          <option value="pending">⏳ Pending</option>
+        </select>
+      </div>
+      <div class="form-full">
+        <label>Note</label>
+        <textarea id="f-note" placeholder="Optional — any details about this upload…"></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="addRecord()">Add Record</button>
+    </div>
+  </div>
+
+  <!-- Log table -->
+  <div class="card">
+    <div class="card-title">// Upload Log</div>
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <label>Filter by Month:</label>
+      <select id="filter-month" onchange="applyFilter()">
+        <option value="">— All Months —</option>
+      </select>
+      <select id="filter-year" onchange="applyFilter()">
+        <option value="">— All Years —</option>
+      </select>
+      <button class="btn-clear" onclick="clearFilter()">Clear Filter</button>
+      <span class="filter-count" id="filter-count"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Vendor</th>
+            <th>Invoice #</th>
+            <th>Amount</th>
+            <th>Received</th>
+            <th>Uploaded</th>
+            <th>Status</th>
+            <th>Note</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="log-body">
+          <tr><td colspan="8"><div class="empty"><div class="icon">📋</div>Loading records…</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <h2>✏️ Edit Record</h2>
+    <div class="form-grid">
+      <div>
+        <label>Vendor Name</label>
+        <input id="e-vendor" type="text" />
+      </div>
+      <div>
+        <label>Invoice #</label>
+        <input id="e-invoice" type="text" />
+      </div>
+      <div>
+        <label>Amount ($)</label>
+        <input id="e-amount" type="number" step="0.01" min="0" />
+      </div>
+      <div>
+        <label>Date Received</label>
+        <input id="e-received" type="date" />
+      </div>
+      <div>
+        <label>Date Uploaded</label>
+        <input id="e-uploaded" type="date" />
+      </div>
+      <div>
+        <label>Upload Successful?</label>
+        <select id="e-status">
+          <option value="">— Select —</option>
+          <option value="yes">✅ Yes</option>
+          <option value="no">❌ No</option>
+          <option value="pending">⏳ Pending</option>
+        </select>
+      </div>
+      <div class="form-full">
+        <label>Note</label>
+        <textarea id="e-note"></textarea>
+      </div>
+    </div>
+    <div class="form-actions" style="margin-top:12px">
+      <button class="btn-primary" onclick="saveEdit()">Save Changes</button>
+      <button class="btn-cancel"  onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, getDocs,
+    doc, deleteDoc, updateDoc, onSnapshot, orderBy, query
+  } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDGfLmEZWJJdXwgDxsph0BQqeUHpeum6xM",
+    authDomain:        "castle-click-tracker.firebaseapp.com",
+    projectId:         "castle-click-tracker",
+    storageBucket:     "castle-click-tracker.firebasestorage.app",
+    messagingSenderId: "499568518560",
+    appId:             "1:499568518560:web:fc23f2a2085edeeffe30c5",
+    measurementId:     "G-312T70037D"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+  const col = collection(db, "uploads");
+
+  let editingId = null;
+  let allRecords = [];
+
+  const MONTHS = ["January","February","March","April","May","June",
+                  "July","August","September","October","November","December"];
+
+  // ── Real-time listener ──────────────────────────────────────
+  const q = query(col, orderBy("createdAt", "desc"));
+  onSnapshot(q, snap => {
+    allRecords = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    populateFilterDropdowns(allRecords);
+    applyFilter();
+  });
+
+  // ── Populate month/year dropdowns from existing data ─────────
+  function populateFilterDropdowns(records) {
+    const years  = new Set();
+    records.forEach(r => {
+      const d = r.dateReceived || r.dateUploaded;
+      if (d) years.add(d.slice(0, 4));
+    });
+
+    const ySel = document.getElementById("filter-year");
+    const curY = ySel.value;
+    ySel.innerHTML = '<option value="">— All Years —</option>';
+    [...years].sort().reverse().forEach(y => {
+      ySel.innerHTML += `<option value="${y}" ${y===curY?"selected":""}>${y}</option>`;
+    });
+
+    const mSel = document.getElementById("filter-month");
+    const curM = mSel.value;
+    mSel.innerHTML = '<option value="">— All Months —</option>';
+    MONTHS.forEach((name, i) => {
+      const val = String(i + 1).padStart(2, "0");
+      mSel.innerHTML += `<option value="${val}" ${val===curM?"selected":""}>${name}</option>`;
+    });
   }
-}
-```
 
-This requires users to be logged in. Ask if you want to add Firebase Authentication.
+  // ── Apply filter ─────────────────────────────────────────────
+  window.applyFilter = () => {
+    const month = document.getElementById("filter-month").value;
+    const year  = document.getElementById("filter-year").value;
 
----
+    let filtered = allRecords;
+    if (month || year) {
+      filtered = allRecords.filter(r => {
+        const d = r.dateReceived || r.dateUploaded || "";
+        if (!d) return false;
+        const [y, m] = d.split("-");
+        if (year  && y !== year)  return false;
+        if (month && m !== month) return false;
+        return true;
+      });
+    }
 
-## Features
+    renderTable(filtered);
+    renderStats(filtered);
 
-- Add upload records with vendor name, dates, and success status
-- Search/filter by vendor name
-- Delete records
-- Live stats (total / success / failed)
-- Fully responsive
+    const countEl = document.getElementById("filter-count");
+    if (month || year) {
+      const mName = month ? MONTHS[parseInt(month)-1] : "";
+      const label = [mName, year].filter(Boolean).join(" ");
+      countEl.textContent = `Showing ${filtered.length} record${filtered.length!==1?"s":""} for ${label}`;
+    } else {
+      countEl.textContent = "";
+    }
+  };
+
+  // ── Clear filter ─────────────────────────────────────────────
+  window.clearFilter = () => {
+    document.getElementById("filter-month").value = "";
+    document.getElementById("filter-year").value  = "";
+    applyFilter();
+  };
+
+  // ── Render table ────────────────────────────────────────────
+  function renderTable(records) {
+    const tbody = document.getElementById("log-body");
+    if (!records.length) {
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="icon">📋</div>No records yet — add one above.</div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = records.map(r => `
+      <tr>
+        <td class="td-vendor">${esc(r.vendorName)}</td>
+        <td>${esc(r.invoiceNum || "—")}</td>
+        <td class="td-amount">${r.amount != null ? "$" + Number(r.amount).toFixed(2) : "—"}</td>
+        <td>${fmt(r.dateReceived)}</td>
+        <td>${fmt(r.dateUploaded)}</td>
+        <td>${badge(r.status)}</td>
+        <td class="td-note">${esc(r.note || "—")}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn-edit"   onclick="window._edit('${r.id}')">✏️ Edit</button>
+            <button class="btn-delete" onclick="window._delete('${r.id}')">🗑 Delete</button>
+          </div>
+        </td>
+      </tr>`).join("");
+  }
+
+  // ── Stats ───────────────────────────────────────────────────
+  function renderStats(records) {
+    document.getElementById("stat-total").textContent   = records.length;
+    document.getElementById("stat-yes").textContent     = records.filter(r => r.status === "yes").length;
+    document.getElementById("stat-no").textContent      = records.filter(r => r.status === "no").length;
+    document.getElementById("stat-pending").textContent = records.filter(r => r.status === "pending" || !r.status).length;
+  }
+
+  // ── Add ─────────────────────────────────────────────────────
+  window.addRecord = async () => {
+    const vendor   = document.getElementById("f-vendor").value.trim();
+    const invoice  = document.getElementById("f-invoice").value.trim();
+    const amount   = document.getElementById("f-amount").value;
+    const received = document.getElementById("f-received").value;
+    const uploaded = document.getElementById("f-uploaded").value;
+    const status   = document.getElementById("f-status").value;
+    const note     = document.getElementById("f-note").value.trim();
+
+    if (!vendor) { alert("Vendor name is required."); return; }
+
+    await addDoc(col, {
+      vendorName:   vendor,
+      invoiceNum:   invoice,
+      amount:       amount ? parseFloat(amount) : null,
+      dateReceived: received,
+      dateUploaded: uploaded,
+      status:       status || "pending",
+      note:         note,
+      createdAt:    Date.now()
+    });
+
+    ["f-vendor","f-invoice","f-amount","f-received","f-uploaded","f-note"]
+      .forEach(id => document.getElementById(id).value = "");
+    document.getElementById("f-status").value = "";
+  };
+
+  // ── Delete ──────────────────────────────────────────────────
+  window._delete = async (id) => {
+    if (!confirm("Delete this record? This cannot be undone.")) return;
+    await deleteDoc(doc(db, "uploads", id));
+  };
+
+  // ── Open edit modal ─────────────────────────────────────────
+  window._edit = async (id) => {
+    const snap = await getDocs(query(col));
+    const record = snap.docs.find(d => d.id === id);
+    if (!record) return;
+    const r = record.data();
+
+    editingId = id;
+    document.getElementById("e-vendor").value   = r.vendorName    || "";
+    document.getElementById("e-invoice").value  = r.invoiceNum    || "";
+    document.getElementById("e-amount").value   = r.amount != null ? r.amount : "";
+    document.getElementById("e-received").value = r.dateReceived  || "";
+    document.getElementById("e-uploaded").value = r.dateUploaded  || "";
+    document.getElementById("e-status").value   = r.status        || "";
+    document.getElementById("e-note").value     = r.note          || "";
+
+    document.getElementById("edit-modal").classList.add("open");
+  };
+
+  // ── Save edit ────────────────────────────────────────────────
+  window.saveEdit = async () => {
+    if (!editingId) return;
+    const amount = document.getElementById("e-amount").value;
+
+    await updateDoc(doc(db, "uploads", editingId), {
+      vendorName:   document.getElementById("e-vendor").value.trim(),
+      invoiceNum:   document.getElementById("e-invoice").value.trim(),
+      amount:       amount ? parseFloat(amount) : null,
+      dateReceived: document.getElementById("e-received").value,
+      dateUploaded: document.getElementById("e-uploaded").value,
+      status:       document.getElementById("e-status").value || "pending",
+      note:         document.getElementById("e-note").value.trim(),
+    });
+
+    closeModal();
+  };
+
+  // ── Close modal ──────────────────────────────────────────────
+  window.closeModal = () => {
+    editingId = null;
+    document.getElementById("edit-modal").classList.remove("open");
+  };
+
+  document.getElementById("edit-modal").addEventListener("click", e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+
+  // ── Helpers ──────────────────────────────────────────────────
+  function esc(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  function fmt(d) {
+    if (!d) return "—";
+    const [y,m,day] = d.split("-");
+    return `${m}/${day}/${y}`;
+  }
+  function badge(status) {
+    const map = {
+      yes:     ["badge-yes",     "✅ Yes"],
+      no:      ["badge-no",      "❌ No"],
+      pending: ["badge-pending", "⏳ Pending"],
+    };
+    const [cls, label] = map[status] || map.pending;
+    return `<span class="badge ${cls}">${label}</span>`;
+  }
+</script>
+</body>
+</html>
