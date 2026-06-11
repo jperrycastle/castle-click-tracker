@@ -450,10 +450,26 @@
   });
 
   // ── Populate month/year dropdowns from existing data ─────────
+  function getRecordDate(r) {
+    // Try every possible date field, old and new
+    const raw = r.dateReceived || r.dateUploaded || r.received || r.uploaded
+              || r.daterecieved || r.dateuploaded || r.date || r.Date || "";
+    if (raw && raw.includes("-")) return raw; // "YYYY-MM-DD"
+    // Fall back to createdAt timestamp
+    if (r.createdAt) {
+      const d = new Date(r.createdAt);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+    return "";
+  }
+
   function populateFilterDropdowns(records) {
-    const years  = new Set();
+    const years = new Set();
     records.forEach(r => {
-      const d = r.dateReceived || r.dateUploaded;
+      const d = getRecordDate(r);
       if (d) years.add(d.slice(0, 4));
     });
 
@@ -481,7 +497,7 @@
     let filtered = allRecords;
     if (month || year) {
       filtered = allRecords.filter(r => {
-        const d = r.dateReceived || r.dateUploaded || "";
+        const d = getRecordDate(r);
         if (!d) return false;
         const [y, m] = d.split("-");
         if (year  && y !== year)  return false;
