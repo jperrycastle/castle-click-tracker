@@ -56,37 +56,7 @@
       font-style: italic;
     }
 
-    /* ── Stats bar ── */
-    .stats {
-      display: flex;
-      gap: 14px;
-      padding: 20px 36px;
-      flex-wrap: wrap;
-    }
-    .stat {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 22px;
-      min-width: 120px;
-      box-shadow: 0 1px 3px rgba(0,0,0,.06);
-    }
-    .stat-label {
-      font-size: .68rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .stat-value {
-      font-size: 1.6rem;
-      font-weight: 700;
-      margin-top: 3px;
-      color: var(--text);
-    }
-    .stat-value.green   { color: var(--green); }
-    .stat-value.red     { color: var(--red);   }
-    .stat-value.yellow  { color: var(--yellow);}
-    .stat-value.gold    { color: var(--gold);  }
+
 
     /* ── Main ── */
     .main { padding: 0 36px; display: flex; flex-direction: column; gap: 24px; }
@@ -280,30 +250,13 @@
   <div class="brand-tag">Internal Use Only</div>
 </header>
 
-<div class="stats">
-  <div class="stat">
-    <div class="stat-label">Total</div>
-    <div class="stat-value gold" id="stat-total">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">Success</div>
-    <div class="stat-value green" id="stat-yes">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">Failed</div>
-    <div class="stat-value red" id="stat-no">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">Pending</div>
-    <div class="stat-value yellow" id="stat-pending">—</div>
-  </div>
-</div>
+
 
 <div class="main">
 
   <!-- Add form -->
   <div class="card">
-    <div class="card-title">// Add Upload Record</div>
+    <div class="card-title">Add Invoice Details</div>
     <div class="form-grid">
       <div>
         <label>Vendor Name</label>
@@ -552,7 +505,6 @@
     });
 
     renderTable(filtered);
-    renderStats(filtered);
 
     const countEl = document.getElementById("filter-count");
     if (search || month || year) {
@@ -598,13 +550,7 @@
       </tr>`).join("");
   }
 
-  // ── Stats ───────────────────────────────────────────────────
-  function renderStats(records) {
-    document.getElementById("stat-total").textContent   = records.length;
-    document.getElementById("stat-yes").textContent     = records.filter(r => r.status === "yes").length;
-    document.getElementById("stat-no").textContent      = records.filter(r => r.status === "no").length;
-    document.getElementById("stat-pending").textContent = records.filter(r => r.status === "pending" || !r.status).length;
-  }
+
 
   // ── Add ─────────────────────────────────────────────────────
   window.addRecord = async () => {
