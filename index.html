@@ -540,7 +540,7 @@
         <td class="td-amount">${r.amount != null ? "$" + Number(r.amount).toFixed(2) : "—"}</td>
         <td>${fmt(r.dateReceived || r.daterecieved || r.received || "")}</td>
         <td>${fmt(r.dateUploaded || r.dateuploaded || r.uploaded || "")}</td>
-        <td>${badge(r.status || r.Status || r.successfulUpload)}</td>
+        <td>${badge(r.status || r.Status || r.successfulUpload || r.UploadSuccessful || r.uploadSuccessful || "pending")}</td>
         <td class="td-note">${esc(r.note || r.Note || "—")}</td>
         <td>
           <div class="row-actions">
@@ -649,10 +649,12 @@
     const [y,m,day] = d.split("-");
     return `${m}/${day}/${y}`;
   }
-  function badge(status) {
-    // Handle old records that used successfulUpload: true/false
-    if (status === true  || status === "true")  status = "yes";
-    if (status === false || status === "false") status = "no";
+  function badge(raw) {
+    // Handle every format old and new records might use
+    let status = raw;
+    if (status === true  || status === "true"  || status === "Yes" || status === "YES") status = "yes";
+    if (status === false || status === "false" || status === "No"  || status === "NO")  status = "no";
+    if (!status || status === "undefined" || status === "null") status = "pending";
     const map = {
       yes:     ["badge-yes",     "✅ Yes"],
       no:      ["badge-no",      "❌ No"],
