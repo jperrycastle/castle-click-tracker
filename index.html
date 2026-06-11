@@ -195,6 +195,30 @@
     .empty { text-align: center; padding: 48px 24px; color: var(--muted); }
     .empty .icon { font-size: 2.4rem; margin-bottom: 10px; }
 
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .filter-bar label { margin-bottom: 0; white-space: nowrap; }
+    .filter-bar select { width: auto; min-width: 150px; }
+    .btn-clear {
+      background: #e8e8e8;
+      color: var(--muted);
+      padding: 8px 16px;
+      font-size: .8rem;
+      border: 1px solid var(--border);
+    }
+    .filter-count {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-left: auto;
+      font-style: italic;
+    }
+
     /* ── Modal ── */
     .modal-overlay {
       display: none;
@@ -223,30 +247,6 @@
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 1px;
-    }
-
-    /* ── Filter bar ── */
-    .filter-bar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-    .filter-bar label { margin-bottom: 0; white-space: nowrap; }
-    .filter-bar select { width: auto; min-width: 150px; }
-    .btn-clear {
-      background: #e8e8e8;
-      color: var(--muted);
-      padding: 8px 16px;
-      font-size: .8rem;
-      border: 1px solid var(--border);
-    }
-    .filter-count {
-      font-size: .78rem;
-      color: var(--muted);
-      margin-left: auto;
-      font-style: italic;
     }
 
     @media (max-width: 600px) {
@@ -450,7 +450,7 @@
 
   // ── Populate month/year dropdowns from existing data ─────────
   function populateFilterDropdowns(records) {
-    const years  = new Set();
+    const years = new Set();
     records.forEach(r => {
       const d = r.dateReceived || r.dateUploaded;
       if (d) years.add(d.slice(0, 4));
@@ -513,7 +513,7 @@
   function renderTable(records) {
     const tbody = document.getElementById("log-body");
     if (!records.length) {
-      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="icon">📋</div>No records yet — add one above.</div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="icon">📋</div>No records found.</div></td></tr>`;
       return;
     }
     tbody.innerHTML = records.map(r => `
@@ -564,83 +564,3 @@
       note:         note,
       createdAt:    Date.now()
     });
-
-    ["f-vendor","f-invoice","f-amount","f-received","f-uploaded","f-note"]
-      .forEach(id => document.getElementById(id).value = "");
-    document.getElementById("f-status").value = "";
-  };
-
-  // ── Delete ──────────────────────────────────────────────────
-  window._delete = async (id) => {
-    if (!confirm("Delete this record? This cannot be undone.")) return;
-    await deleteDoc(doc(db, "uploads", id));
-  };
-
-  // ── Open edit modal ─────────────────────────────────────────
-  window._edit = async (id) => {
-    const snap = await getDocs(query(col));
-    const record = snap.docs.find(d => d.id === id);
-    if (!record) return;
-    const r = record.data();
-
-    editingId = id;
-    document.getElementById("e-vendor").value   = r.vendorName    || "";
-    document.getElementById("e-invoice").value  = r.invoiceNum    || "";
-    document.getElementById("e-amount").value   = r.amount != null ? r.amount : "";
-    document.getElementById("e-received").value = r.dateReceived  || "";
-    document.getElementById("e-uploaded").value = r.dateUploaded  || "";
-    document.getElementById("e-status").value   = r.status        || "";
-    document.getElementById("e-note").value     = r.note          || "";
-
-    document.getElementById("edit-modal").classList.add("open");
-  };
-
-  // ── Save edit ────────────────────────────────────────────────
-  window.saveEdit = async () => {
-    if (!editingId) return;
-    const amount = document.getElementById("e-amount").value;
-
-    await updateDoc(doc(db, "uploads", editingId), {
-      vendorName:   document.getElementById("e-vendor").value.trim(),
-      invoiceNum:   document.getElementById("e-invoice").value.trim(),
-      amount:       amount ? parseFloat(amount) : null,
-      dateReceived: document.getElementById("e-received").value,
-      dateUploaded: document.getElementById("e-uploaded").value,
-      status:       document.getElementById("e-status").value || "pending",
-      note:         document.getElementById("e-note").value.trim(),
-    });
-
-    closeModal();
-  };
-
-  // ── Close modal ──────────────────────────────────────────────
-  window.closeModal = () => {
-    editingId = null;
-    document.getElementById("edit-modal").classList.remove("open");
-  };
-
-  document.getElementById("edit-modal").addEventListener("click", e => {
-    if (e.target === e.currentTarget) closeModal();
-  });
-
-  // ── Helpers ──────────────────────────────────────────────────
-  function esc(s) {
-    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  }
-  function fmt(d) {
-    if (!d) return "—";
-    const [y,m,day] = d.split("-");
-    return `${m}/${day}/${y}`;
-  }
-  function badge(status) {
-    const map = {
-      yes:     ["badge-yes",     "✅ Yes"],
-      no:      ["badge-no",      "❌ No"],
-      pending: ["badge-pending", "⏳ Pending"],
-    };
-    const [cls, label] = map[status] || map.pending;
-    return `<span class="badge ${cls}">${label}</span>`;
-  }
-</script>
-</body>
-</html>
