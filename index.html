@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -230,6 +231,17 @@
       letter-spacing: 1px;
     }
 
+    /* ── Fix button ── */
+    .btn-fix {
+      background: #fff8e1;
+      color: #b8860b;
+      border: 1px solid #f5dfa0;
+      padding: 6px 14px;
+      font-size: .75rem;
+      border-radius: 5px;
+    }
+    .btn-fix:hover { background: #fef3dc; }
+
     /* ── Filter bar ── */
     .filter-bar {
       display: flex;
@@ -344,7 +356,10 @@
 
   <!-- Log table -->
   <div class="card">
-    <div class="card-title">// Upload Log</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <div class="card-title" style="margin-bottom:0;">// Upload Log</div>
+      <button class="btn-fix" onclick="fixOldRecords()" id="fix-btn" title="One-time fix: converts old yes/true upload status to Successful">🔧 Fix Old Records</button>
+    </div>
     <!-- Filter bar -->
     <div class="filter-bar">
       <input id="filter-search" type="text" placeholder="🔍 Search vendor..." oninput="applyFilter()" style="min-width:180px;width:auto;" />
@@ -667,6 +682,35 @@
     });
 
     closeModal();
+  };
+
+  // ── Fix old records ─────────────────────────────────────────
+  window.fixOldRecords = async () => {
+    if (!confirm("This will update all records where Upload Status is yes/true to Successful. Continue?")) return;
+    const btn = document.getElementById("fix-btn");
+    btn.textContent = "⏳ Fixing…";
+    btn.disabled = true;
+
+    const snap = await getDocs(col);
+    let count = 0;
+    for (const d of snap.docs) {
+      const r = d.data();
+      const raw = r.uploadStatus || r.successfulUpload || r.UploadSuccessful || r.uploadSuccessful;
+      if (raw === true || raw === "true" || raw === "yes" || raw === "Yes" || raw === "YES") {
+        await updateDoc(doc(db, "uploads", d.id), { uploadStatus: "successful" });
+        count++;
+      }
+      if (raw === false || raw === "false" || raw === "no" || raw === "No" || raw === "NO") {
+        await updateDoc(doc(db, "uploads", d.id), { uploadStatus: "failed" });
+        count++;
+      }
+    }
+
+    btn.textContent = `✅ Done (${count} updated)`;
+    setTimeout(() => {
+      btn.textContent = "🔧 Fix Old Records";
+      btn.disabled = false;
+    }, 4000);
   };
 
   // ── Close modal ──────────────────────────────────────────────
