@@ -359,6 +359,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
       <div class="card-title" style="margin-bottom:0;">// Upload Log</div>
       <button class="btn-fix" onclick="fixOldRecords()" id="fix-btn" title="One-time fix: converts old yes/true upload status to Successful">🔧 Fix Old Records</button>
+      <button class="btn-fix" onclick="debugRecords()" style="background:#f0e8fe;color:#7c3aed;border-color:#d5b8f8;">🔎 Debug Fields</button>
     </div>
     <!-- Filter bar -->
     <div class="filter-bar">
@@ -682,6 +683,17 @@
     });
 
     closeModal();
+  };
+
+  // ── Debug old records ───────────────────────────────────────
+  window.debugRecords = async () => {
+    const snap = await getDocs(col);
+    const sample = snap.docs.slice(0, 3).map(d => ({
+      id: d.id,
+      fields: Object.keys(d.data()),
+      data: d.data()
+    }));
+    alert("First 3 records:\n\n" + JSON.stringify(sample, null, 2));
   };
 
   // ── Fix old records ─────────────────────────────────────────
