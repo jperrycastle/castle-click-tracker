@@ -358,8 +358,8 @@
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
       <div class="card-title" style="margin-bottom:0;">// Upload Log</div>
-      <button class="btn-fix" onclick="fixOldRecords()" id="fix-btn" title="One-time fix: converts old yes/true upload status to Successful">🔧 Fix Old Records</button>
-      <button class="btn-fix" onclick="debugRecords()" style="background:#f0e8fe;color:#7c3aed;border-color:#d5b8f8;">🔎 Debug Fields</button>
+      <button class="btn-fix" onclick="if(window.fixOldRecords)fixOldRecords();else alert('Page still loading, try again')" id="fix-btn" title="One-time fix: converts old yes/true upload status to Successful">🔧 Fix Old Records</button>
+      <button class="btn-fix" onclick="if(window.debugRecords)debugRecords();else alert('Page still loading, try again')" style="background:#f0e8fe;color:#7c3aed;border-color:#d5b8f8;">🔎 Debug Fields</button>
     </div>
     <!-- Filter bar -->
     <div class="filter-bar">
@@ -493,11 +493,8 @@
 
   // ── Populate month/year dropdowns from existing data ─────────
   function getRecordDate(r) {
-    // Try every possible date field, old and new
-    const raw = r.dateReceived || r.dateUploaded || r.received || r.uploaded
-              || r.daterecieved || r.dateuploaded || r.date || r.Date || "";
-    if (raw && raw.includes("-")) return raw; // "YYYY-MM-DD"
-    // Fall back to createdAt timestamp
+    const raw = r.dateReceived || r.received || r.dateUploaded || r.uploaded || "";
+    if (raw && raw.includes("-")) return raw;
     if (r.createdAt) {
       const d = new Date(r.createdAt);
       const y = d.getFullYear();
@@ -584,14 +581,14 @@
     }
     tbody.innerHTML = records.map(r => `
       <tr>
-        <td class="td-vendor">${esc(r.vendorName || r.vendor || r.Vendor || r.VendorName || "—")}</td>
-        <td>${esc(r.invoiceNum || r.invoice || r.Invoice || r.invoiceNumber || "—")}</td>
+        <td class="td-vendor">${esc(r.vendorName || r.vendor || "—")}</td>
+        <td>${esc(r.invoiceNum || r.invoice || "—")}</td>
         <td class="td-amount">${r.amount != null ? "$" + Number(r.amount).toFixed(2) : "—"}</td>
-        <td>${fmt(r.dateReceived || r.daterecieved || r.received || "")}</td>
-        <td>${fmt(r.dateUploaded || r.dateuploaded || r.uploaded || "")}</td>
-        <td>${uploadBadge(r.uploadStatus || r.successfulUpload || r.UploadSuccessful || r.uploadSuccessful)}</td>
+        <td>${fmt(r.dateReceived || r.received || "")}</td>
+        <td>${fmt(r.dateUploaded || r.uploaded || "")}</td>
+        <td>${uploadBadge(r.uploadStatus || r.success)}</td>
         <td>${statusBadge(r.status || r.Status)}</td>
-        <td class="td-note">${esc(r.note || r.Note || "—")}</td>
+        <td class="td-note">${esc(r.note || "—")}</td>
         <td>
           <div class="row-actions">
             <button class="btn-edit"   onclick="window._edit('${r.id}')">✏️ Edit</button>
@@ -654,13 +651,13 @@
     const r = record.data();
 
     editingId = id;
-    document.getElementById("e-vendor").value   = r.vendorName    || "";
-    document.getElementById("e-invoice").value  = r.invoiceNum    || "";
-    document.getElementById("e-amount").value   = r.amount != null ? r.amount : "";
-    document.getElementById("e-received").value = r.dateReceived  || "";
-    document.getElementById("e-uploaded").value = r.dateUploaded  || "";
-    document.getElementById("e-upload-status").value = r.uploadStatus || r.successfulUpload || "";
-    document.getElementById("e-status").value         = r.status        || "";
+    document.getElementById("e-vendor").value        = r.vendorName || r.vendor   || "";
+    document.getElementById("e-invoice").value       = r.invoiceNum || r.invoice  || "";
+    document.getElementById("e-amount").value        = r.amount != null ? r.amount : "";
+    document.getElementById("e-received").value      = r.dateReceived || r.received || "";
+    document.getElementById("e-uploaded").value      = r.dateUploaded || r.uploaded || "";
+    document.getElementById("e-upload-status").value = r.uploadStatus || r.success  || "";
+    document.getElementById("e-status").value        = r.status || "";
     document.getElementById("e-note").value     = r.note          || "";
 
     document.getElementById("edit-modal").classList.add("open");
@@ -693,7 +690,8 @@
       fields: Object.keys(d.data()),
       data: d.data()
     }));
-    alert("First 3 records:\n\n" + JSON.stringify(sample, null, 2));
+    console.log("DEBUG:", JSON.stringify(sample, null, 2));
+    alert("Check browser console (F12) for field names!\n\nFields in first record:\n" + Object.keys(snap.docs[0].data()).join("\n"));
   };
 
   // ── Fix old records ─────────────────────────────────────────
@@ -709,8 +707,7 @@
       const r = d.data();
 
       // Collect every possible field that might hold the old upload status
-      const raw = r.uploadStatus ?? r.successfulUpload ?? r.UploadSuccessful ??
-                  r.uploadSuccessful ?? r.status ?? r.Status ?? r["Upload Successful?"] ?? null;
+      const raw = r.uploadStatus ?? r.success ?? r.successfulUpload ?? r.UploadSuccessful ?? null;
 
       const yes = [true, "true", "yes", "Yes", "YES", "y", "Y", "✅ Yes", "successful", "Successful"];
       const no  = [false, "false", "no", "No", "NO", "n", "N", "❌ No", "failed", "Failed"];
