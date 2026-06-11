@@ -201,17 +201,6 @@
       letter-spacing: 1px;
     }
 
-    /* ── Fix button ── */
-    .btn-fix {
-      background: #fff8e1;
-      color: #b8860b;
-      border: 1px solid #f5dfa0;
-      padding: 6px 14px;
-      font-size: .75rem;
-      border-radius: 5px;
-    }
-    .btn-fix:hover { background: #fef3dc; }
-
     /* ── Filter bar ── */
     .filter-bar {
       display: flex;
@@ -309,11 +298,7 @@
 
   <!-- Log table -->
   <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-      <div class="card-title" style="margin-bottom:0;">// Upload Log</div>
-      <button class="btn-fix" onclick="if(window.fixOldRecords)fixOldRecords();else alert('Page still loading, try again')" id="fix-btn" title="One-time fix: converts old yes/true upload status to Successful">🔧 Fix Old Records</button>
-      <button class="btn-fix" onclick="if(window.debugRecords)debugRecords();else alert('Page still loading, try again')" style="background:#f0e8fe;color:#7c3aed;border-color:#d5b8f8;">🔎 Debug Fields</button>
-    </div>
+    <div class="card-title">// Upload Log</div>
     <!-- Filter bar -->
     <div class="filter-bar">
       <input id="filter-search" type="text" placeholder="🔍 Search vendor..." oninput="applyFilter()" style="min-width:180px;width:auto;" />
@@ -626,54 +611,6 @@
     });
 
     closeModal();
-  };
-
-  // ── Debug old records ───────────────────────────────────────
-  window.debugRecords = async () => {
-    const snap = await getDocs(col);
-    const sample = snap.docs.slice(0, 3).map(d => ({
-      id: d.id,
-      fields: Object.keys(d.data()),
-      data: d.data()
-    }));
-    console.log("DEBUG:", JSON.stringify(sample, null, 2));
-    alert("Check browser console (F12) for field names!\n\nFields in first record:\n" + Object.keys(snap.docs[0].data()).join("\n"));
-  };
-
-  // ── Fix old records ─────────────────────────────────────────
-  window.fixOldRecords = async () => {
-    if (!confirm("This will scan all records and fix Upload Status values. Continue?")) return;
-    const btn = document.getElementById("fix-btn");
-    btn.textContent = "⏳ Fixing…";
-    btn.disabled = true;
-
-    const snap = await getDocs(col);
-    let count = 0;
-    for (const d of snap.docs) {
-      const r = d.data();
-
-      // Collect every possible field that might hold the old upload status
-      const raw = r.uploadStatus ?? r.success ?? r.successfulUpload ?? r.UploadSuccessful ?? null;
-
-      const yes = [true, "true", "yes", "Yes", "YES", "y", "Y", "✅ Yes", "successful", "Successful"];
-      const no  = [false, "false", "no", "No", "NO", "n", "N", "❌ No", "failed", "Failed"];
-
-      let newUpload = null;
-      if (yes.includes(raw)) newUpload = "successful";
-      if (no.includes(raw))  newUpload = "failed";
-
-      // Only update if uploadStatus isn't already correct
-      if (newUpload && r.uploadStatus !== newUpload) {
-        await updateDoc(doc(db, "uploads", d.id), { uploadStatus: newUpload });
-        count++;
-      }
-    }
-
-    btn.textContent = `✅ Done (${count} updated)`;
-    setTimeout(() => {
-      btn.textContent = "🔧 Fix Old Records";
-      btn.disabled = false;
-    }, 4000);
   };
 
   // ── Close modal ──────────────────────────────────────────────
