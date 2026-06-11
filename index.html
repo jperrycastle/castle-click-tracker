@@ -686,7 +686,7 @@
 
   // ── Fix old records ─────────────────────────────────────────
   window.fixOldRecords = async () => {
-    if (!confirm("This will update all records where Upload Status is yes/true to Successful. Continue?")) return;
+    if (!confirm("This will scan all records and fix Upload Status values. Continue?")) return;
     const btn = document.getElementById("fix-btn");
     btn.textContent = "⏳ Fixing…";
     btn.disabled = true;
@@ -695,13 +695,21 @@
     let count = 0;
     for (const d of snap.docs) {
       const r = d.data();
-      const raw = r.uploadStatus || r.successfulUpload || r.UploadSuccessful || r.uploadSuccessful;
-      if (raw === true || raw === "true" || raw === "yes" || raw === "Yes" || raw === "YES") {
-        await updateDoc(doc(db, "uploads", d.id), { uploadStatus: "successful" });
-        count++;
-      }
-      if (raw === false || raw === "false" || raw === "no" || raw === "No" || raw === "NO") {
-        await updateDoc(doc(db, "uploads", d.id), { uploadStatus: "failed" });
+
+      // Collect every possible field that might hold the old upload status
+      const raw = r.uploadStatus ?? r.successfulUpload ?? r.UploadSuccessful ??
+                  r.uploadSuccessful ?? r.status ?? r.Status ?? r["Upload Successful?"] ?? null;
+
+      const yes = [true, "true", "yes", "Yes", "YES", "y", "Y", "✅ Yes", "successful", "Successful"];
+      const no  = [false, "false", "no", "No", "NO", "n", "N", "❌ No", "failed", "Failed"];
+
+      let newUpload = null;
+      if (yes.includes(raw)) newUpload = "successful";
+      if (no.includes(raw))  newUpload = "failed";
+
+      // Only update if uploadStatus isn't already correct
+      if (newUpload && r.uploadStatus !== newUpload) {
+        await updateDoc(doc(db, "uploads", d.id), { uploadStatus: newUpload });
         count++;
       }
     }
