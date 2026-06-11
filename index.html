@@ -439,9 +439,11 @@
                   "July","August","September","October","November","December"];
 
   // ── Real-time listener ──────────────────────────────────────
-  const q = query(col, orderBy("createdAt", "desc"));
-  onSnapshot(q, snap => {
-    allRecords = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // No orderBy so old records without createdAt field still load
+  onSnapshot(col, snap => {
+    allRecords = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     populateFilterDropdowns(allRecords);
     applyFilter();
   });
