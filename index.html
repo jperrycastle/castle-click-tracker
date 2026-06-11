@@ -183,9 +183,14 @@
       font-weight: 700;
       white-space: nowrap;
     }
-    .badge-yes     { background: #e6f4ec; color: var(--green); border: 1px solid #b7dfc6; }
-    .badge-no      { background: #fdecea; color: var(--red);   border: 1px solid #f5c0bb; }
-    .badge-pending { background: #fef3dc; color: var(--yellow); border: 1px solid #f5dfa0; }
+    .badge-yes          { background: #e6f4ec; color: var(--green);  border: 1px solid #b7dfc6; }
+    .badge-no           { background: #fdecea; color: var(--red);    border: 1px solid #f5c0bb; }
+    .badge-pending      { background: #f0f0f0; color: var(--muted);  border: 1px solid #d0d0d0; }
+    .badge-inprogress   { background: #e8f0fe; color: #3a5bc7;       border: 1px solid #c7d0f0; }
+    .badge-qualitycheck { background: #fff4e0; color: #b7791f;       border: 1px solid #f5dfa0; }
+    .badge-approved     { background: #e6f4ec; color: var(--green);  border: 1px solid #b7dfc6; }
+    .badge-exported     { background: #f0e8fe; color: #7c3aed;       border: 1px solid #d5b8f8; }
+    .badge-paid         { background: #fef9e0; color: #b8860b;       border: 1px solid #f0d57a; }
 
     /* ── Row actions ── */
     .row-actions { display: flex; gap: 6px; }
@@ -310,12 +315,22 @@
         <input id="f-uploaded" type="date" />
       </div>
       <div>
-        <label>Upload Successful?</label>
+        <label>Upload Status</label>
+        <select id="f-upload-status">
+          <option value="">— Select —</option>
+          <option value="successful">✅ Successful</option>
+          <option value="failed">❌ Failed</option>
+        </select>
+      </div>
+      <div>
+        <label>Invoice Status</label>
         <select id="f-status">
           <option value="">— Select —</option>
-          <option value="yes">✅ Yes</option>
-          <option value="no">❌ No</option>
-          <option value="pending">⏳ Pending</option>
+          <option value="inprogress">🔄 In Progress</option>
+          <option value="qualitycheck">🔍 Quality Check</option>
+          <option value="approved">✅ Approved</option>
+          <option value="exported">📤 Exported</option>
+          <option value="paid">💰 Paid</option>
         </select>
       </div>
       <div class="form-full">
@@ -353,13 +368,14 @@
             <th>Amount</th>
             <th>Received</th>
             <th>Uploaded</th>
-            <th>Status</th>
+            <th>Upload Status</th>
+            <th>Invoice Status</th>
             <th>Note</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody id="log-body">
-          <tr><td colspan="8"><div class="empty"><div class="icon">📋</div>Loading records…</div></td></tr>
+          <tr><td colspan="9"><div class="empty"><div class="icon">📋</div>Loading records…</div></td></tr>
         </tbody>
       </table>
     </div>
@@ -393,12 +409,22 @@
         <input id="e-uploaded" type="date" />
       </div>
       <div>
-        <label>Upload Successful?</label>
+        <label>Upload Status</label>
+        <select id="e-upload-status">
+          <option value="">— Select —</option>
+          <option value="successful">✅ Successful</option>
+          <option value="failed">❌ Failed</option>
+        </select>
+      </div>
+      <div>
+        <label>Invoice Status</label>
         <select id="e-status">
           <option value="">— Select —</option>
-          <option value="yes">✅ Yes</option>
-          <option value="no">❌ No</option>
-          <option value="pending">⏳ Pending</option>
+          <option value="inprogress">🔄 In Progress</option>
+          <option value="qualitycheck">🔍 Quality Check</option>
+          <option value="approved">✅ Approved</option>
+          <option value="exported">📤 Exported</option>
+          <option value="paid">💰 Paid</option>
         </select>
       </div>
       <div class="form-full">
@@ -538,7 +564,7 @@
   function renderTable(records) {
     const tbody = document.getElementById("log-body");
     if (!records.length) {
-      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="icon">📋</div>No records yet — add one above.</div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="icon">📋</div>No records yet — add one above.</div></td></tr>`;
       return;
     }
     tbody.innerHTML = records.map(r => `
@@ -548,7 +574,8 @@
         <td class="td-amount">${r.amount != null ? "$" + Number(r.amount).toFixed(2) : "—"}</td>
         <td>${fmt(r.dateReceived || r.daterecieved || r.received || "")}</td>
         <td>${fmt(r.dateUploaded || r.dateuploaded || r.uploaded || "")}</td>
-        <td>${badge(r.status || r.Status || r.successfulUpload || r.UploadSuccessful || r.uploadSuccessful || "pending")}</td>
+        <td>${uploadBadge(r.uploadStatus || r.successfulUpload || r.UploadSuccessful || r.uploadSuccessful)}</td>
+        <td>${statusBadge(r.status || r.Status)}</td>
         <td class="td-note">${esc(r.note || r.Note || "—")}</td>
         <td>
           <div class="row-actions">
@@ -579,19 +606,22 @@
 
     if (!vendor) { alert("Vendor name is required."); return; }
 
+    const uploadStatus = document.getElementById("f-upload-status").value;
     await addDoc(col, {
       vendorName:   vendor,
       invoiceNum:   invoice,
       amount:       amount ? parseFloat(amount) : null,
       dateReceived: received,
       dateUploaded: uploaded,
-      status:       status || "pending",
+      uploadStatus: uploadStatus,
+      status:       status,
       note:         note,
       createdAt:    Date.now()
     });
 
     ["f-vendor","f-invoice","f-amount","f-received","f-uploaded","f-note"]
       .forEach(id => document.getElementById(id).value = "");
+    document.getElementById("f-upload-status").value = "";
     document.getElementById("f-status").value = "";
   };
 
@@ -614,7 +644,8 @@
     document.getElementById("e-amount").value   = r.amount != null ? r.amount : "";
     document.getElementById("e-received").value = r.dateReceived  || "";
     document.getElementById("e-uploaded").value = r.dateUploaded  || "";
-    document.getElementById("e-status").value   = r.status        || "";
+    document.getElementById("e-upload-status").value = r.uploadStatus || r.successfulUpload || "";
+    document.getElementById("e-status").value         = r.status        || "";
     document.getElementById("e-note").value     = r.note          || "";
 
     document.getElementById("edit-modal").classList.add("open");
@@ -631,7 +662,8 @@
       amount:       amount ? parseFloat(amount) : null,
       dateReceived: document.getElementById("e-received").value,
       dateUploaded: document.getElementById("e-uploaded").value,
-      status:       document.getElementById("e-status").value || "pending",
+      uploadStatus: document.getElementById("e-upload-status").value,
+      status:       document.getElementById("e-status").value,
       note:         document.getElementById("e-note").value.trim(),
     });
 
@@ -657,19 +689,28 @@
     const [y,m,day] = d.split("-");
     return `${m}/${day}/${y}`;
   }
-  function badge(raw) {
-    // Handle every format old and new records might use
-    let status = raw;
-    if (status === true  || status === "true"  || status === "Yes" || status === "YES") status = "yes";
-    if (status === false || status === "false" || status === "No"  || status === "NO")  status = "no";
-    if (!status || status === "undefined" || status === "null") status = "pending";
+  function uploadBadge(raw) {
+    let s = raw;
+    if (s === true  || s === "true"  || s === "yes" || s === "Yes") s = "successful";
+    if (s === false || s === "false" || s === "no"  || s === "No")  s = "failed";
     const map = {
-      yes:     ["badge-yes",     "✅ Yes"],
-      no:      ["badge-no",      "❌ No"],
-      pending: ["badge-pending", "⏳ Pending"],
+      successful: ["badge-yes", "✅ Successful"],
+      failed:     ["badge-no",  "❌ Failed"],
     };
-    const [cls, label] = map[status] || map.pending;
-    return `<span class="badge ${cls}">${label}</span>`;
+    const hit = map[s];
+    return hit ? `<span class="badge ${hit[0]}">${hit[1]}</span>` : `<span class="badge badge-pending">—</span>`;
+  }
+
+  function statusBadge(raw) {
+    const map = {
+      inprogress:   ["badge-inprogress",   "🔄 In Progress"],
+      qualitycheck: ["badge-qualitycheck", "🔍 Quality Check"],
+      approved:     ["badge-approved",     "✅ Approved"],
+      exported:     ["badge-exported",     "📤 Exported"],
+      paid:         ["badge-paid",         "💰 Paid"],
+    };
+    const hit = map[raw];
+    return hit ? `<span class="badge ${hit[0]}">${hit[1]}</span>` : `<span class="badge badge-pending">—</span>`;
   }
 </script>
 </body>
