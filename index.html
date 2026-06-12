@@ -233,10 +233,44 @@
 </head>
 <body>
 
+<!-- Login Screen -->
+<div id="login-screen" style="display:none; min-height:100vh; align-items:center; justify-content:center; background:var(--bg);">
+  <div style="background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:40px; width:min(380px,92vw); box-shadow:0 4px 20px rgba(0,0,0,.08);">
+    <div style="text-align:center; margin-bottom:28px;">
+      <div style="font-size:1.6rem; font-weight:800; color:var(--gold);">CastleDrop</div>
+      <div style="font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; margin-top:4px;">Upload Tracker · Internal Use Only</div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <label>Email</label>
+      <input id="login-email" type="email" placeholder="your@email.com" />
+    </div>
+    <div style="margin-bottom:6px;">
+      <label>Password</label>
+      <input id="login-pass" type="password" placeholder="••••••••" />
+    </div>
+    <div style="text-align:right; margin-bottom:18px;">
+      <a href="#" onclick="doForgotPassword(); return false;" style="font-size:.75rem; color:var(--gold); text-decoration:none;">Forgot password?</a>
+    </div>
+    <button class="btn-primary" style="width:100%; padding:11px;" onclick="doLogin()">Sign In</button>
+    <div id="login-error" style="margin-top:12px; font-size:.78rem; color:var(--red); text-align:center; min-height:18px;"></div>
+  </div>
+</div>
+
+<!-- App Screen -->
+<div id="app-screen" style="display:none;">
+
 <header>
-  <div class="brand-name">CastleDrop</div>
-  <div class="brand-sub">Upload Tracker</div>
-  <div class="brand-tag">Internal Use Only</div>
+  <div style="display:flex; align-items:center; justify-content:space-between;">
+    <div>
+      <div class="brand-name">CastleDrop</div>
+      <div class="brand-sub">Upload Tracker</div>
+      <div class="brand-tag">Internal Use Only</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:.75rem; color:var(--muted); margin-bottom:6px;" id="user-email"></div>
+      <button onclick="doSignOut()" style="background:#f0f0f0; color:var(--muted); border:1px solid var(--border); padding:6px 14px; font-size:.75rem; border-radius:5px; cursor:pointer;">Sign Out</button>
+    </div>
+  </div>
 </header>
 
 
@@ -398,6 +432,10 @@
     getFirestore, collection, addDoc, getDocs,
     doc, deleteDoc, updateDoc, onSnapshot, orderBy, query
   } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+  import {
+    getAuth, signInWithEmailAndPassword, signOut,
+    sendPasswordResetEmail, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey:            "AIzaSyDGfLmEZWJJdXwgDxsph0BQqeUHpeum6xM",
@@ -409,9 +447,10 @@
     measurementId:     "G-312T70037D"
   };
 
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
-  const col = collection(db, "uploads");
+  const app  = initializeApp(firebaseConfig);
+  const db   = getFirestore(app);
+  const auth = getAuth(app);
+  const col  = collection(db, "uploads");
 
   let editingId = null;
   let allRecords = [];
@@ -419,14 +458,66 @@
   const MONTHS = ["January","February","March","April","May","June",
                   "July","August","September","October","November","December"];
 
-  // ── Real-time listener ──────────────────────────────────────
-  // No orderBy so old records without createdAt field still load
-  onSnapshot(col, snap => {
-    allRecords = snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    populateFilterDropdowns(allRecords);
-    applyFilter();
+  // ── Auth state listener ─────────────────────────────────────
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      document.getElementById("login-screen").style.display = "none";
+      document.getElementById("app-screen").style.display  = "block";
+      document.getElementById("user-email").textContent = user.email;
+
+      // ── Real-time listener ──────────────────────────────────
+      onSnapshot(col, snap => {
+        allRecords = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        populateFilterDropdowns(allRecords);
+        applyFilter();
+      });
+    } else {
+      document.getElementById("login-screen").style.display = "flex";
+      document.getElementById("app-screen").style.display  = "none";
+    }
+  });
+
+  // ── Login ────────────────────────────────────────────────────
+  window.doLogin = async () => {
+    const email = document.getElementById("login-email").value.trim();
+    const pass  = document.getElementById("login-pass").value;
+    const err   = document.getElementById("login-error");
+    err.textContent = "";
+    if (!email || !pass) { err.textContent = "Please enter your email and password."; return; }
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch(e) {
+      err.textContent = "Invalid email or password. Please try again.";
+    }
+  };
+
+  // ── Sign out ─────────────────────────────────────────────────
+  window.doSignOut = async () => {
+    await signOut(auth);
+  };
+
+  // ── Forgot password ──────────────────────────────────────────
+  window.doForgotPassword = async () => {
+    const email = document.getElementById("login-email").value.trim();
+    if (!email) {
+      document.getElementById("login-error").textContent = "Enter your email above first.";
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      document.getElementById("login-error").style.color = "var(--green)";
+      document.getElementById("login-error").textContent = "Password reset email sent! Check your inbox.";
+    } catch(e) {
+      document.getElementById("login-error").style.color = "var(--red)";
+      document.getElementById("login-error").textContent = "Could not send reset email. Check the address and try again.";
+    }
+  };
+
+  // Allow Enter key to submit login
+  document.getElementById("login-pass").addEventListener("keydown", e => {
+    if (e.key === "Enter") doLogin();
   });
 
   // ── Populate month/year dropdowns from existing data ─────────
@@ -656,5 +747,6 @@
     return hit ? `<span class="badge ${hit[0]}">${hit[1]}</span>` : `<span class="badge badge-pending">—</span>`;
   }
 </script>
+</div><!-- end app-screen -->
 </body>
 </html>
