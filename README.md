@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -185,6 +186,7 @@
     .badge-yes     { background: #e6f4ec; color: var(--green); border: 1px solid #b7dfc6; }
     .badge-no      { background: #fdecea; color: var(--red);   border: 1px solid #f5c0bb; }
     .badge-pending { background: #fef3dc; color: var(--yellow); border: 1px solid #f5dfa0; }
+    .badge-duplicate { background: #ffe6e6; color: var(--red); border: 1px solid #ffb3b3; }
 
     /* ── Row actions ── */
     .row-actions { display: flex; gap: 6px; }
@@ -233,8 +235,8 @@
       margin-bottom: 16px;
       flex-wrap: wrap;
     }
-    .filter-bar label { margin-bottom: 0; white-space: nowrap; }
-    .filter-bar select { width: auto; min-width: 150px; }
+    .filter-bar label { margin-bottom: 0; white-space: nowrap; font-size: .75rem; }
+    .filter-bar select { width: auto; min-width: 100px; }
     .btn-clear {
       background: #e8e8e8;
       color: var(--muted);
@@ -249,9 +251,22 @@
       font-style: italic;
     }
 
+    /* ── Alert box ── */
+    .alert {
+      background: #ffe6e6;
+      border: 1px solid #ffb3b3;
+      color: var(--red);
+      padding: 12px 16px;
+      border-radius: 5px;
+      margin-bottom: 12px;
+      font-size: .85rem;
+    }
+    .alert strong { font-weight: 700; }
+
     @media (max-width: 600px) {
       header, .stats, .main { padding-left: 16px; padding-right: 16px; }
       .form-grid { grid-template-columns: 1fr; }
+      .filter-bar { gap: 8px; font-size: .75rem; }
     }
   </style>
 </head>
@@ -287,6 +302,7 @@
   <!-- Add form -->
   <div class="card">
     <div class="card-title">// Add Upload Record</div>
+    <div id="duplicate-alert"></div>
     <div class="form-grid">
       <div>
         <label>Vendor Name</label>
@@ -332,14 +348,17 @@
     <div class="card-title">// Upload Log</div>
     <!-- Filter bar -->
     <div class="filter-bar">
-      <label>Filter by Month:</label>
+      <input id="filter-invoice" type="text" placeholder="Search invoice #…" onkeyup="applyFilter()" style="width: 140px;" />
+      <input id="filter-amount" type="number" placeholder="Amount ($)" onkeyup="applyFilter()" style="width: 110px;" step="0.01" min="0" />
+      <label>Month:</label>
       <select id="filter-month" onchange="applyFilter()">
-        <option value="">— All Months —</option>
+        <option value="">— All —</option>
       </select>
+      <label style="margin-left: 10px;">Year:</label>
       <select id="filter-year" onchange="applyFilter()">
-        <option value="">— All Years —</option>
+        <option value="">— All —</option>
       </select>
-      <button class="btn-clear" onclick="clearFilter()">Clear Filter</button>
+      <button class="btn-clear" onclick="clearFilter()">Clear All</button>
       <span class="filter-count" id="filter-count"></span>
     </div>
     <div class="table-wrap">
@@ -415,7 +434,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
   import {
     getFirestore, collection, addDoc, getDocs,
-    doc, deleteDoc, updateDoc, onSnapshot, orderBy, query
+    doc, deleteDoc, updateDoc, onSnapshot, orderBy, query, where
   } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -472,12 +491,29 @@
 
   // ── Apply filter ─────────────────────────────────────────────
   window.applyFilter = () => {
-    const month = document.getElementById("filter-month").value;
-    const year  = document.getElementById("filter-year").value;
+    const month    = document.getElementById("filter-month").value;
+    const year     = document.getElementById("filter-year").value;
+    const invoice  = document.getElementById("filter-invoice").value.trim().toLowerCase();
+    const amount   = document.getElementById("filter-amount").value.trim();
 
     let filtered = allRecords;
+
+    // Filter by invoice number
+    if (invoice) {
+      filtered = filtered.filter(r =>
+        (r.invoiceNum || "").toLowerCase().includes(invoice)
+      );
+    }
+
+    // Filter by amount
+    if (amount) {
+      const searchAmount = parseFloat(amount);
+      filtered = filtered.filter(r => r.amount === searchAmount);
+    }
+
+    // Filter by month/year
     if (month || year) {
-      filtered = allRecords.filter(r => {
+      filtered = filtered.filter(r => {
         const d = r.dateReceived || r.dateUploaded || "";
         if (!d) return false;
         const [y, m] = d.split("-");
@@ -491,10 +527,15 @@
     renderStats(filtered);
 
     const countEl = document.getElementById("filter-count");
-    if (month || year) {
-      const mName = month ? MONTHS[parseInt(month)-1] : "";
-      const label = [mName, year].filter(Boolean).join(" ");
-      countEl.textContent = `Showing ${filtered.length} record${filtered.length!==1?"s":""} for ${label}`;
+    const hasFilters = invoice || amount || month || year;
+    if (hasFilters) {
+      let parts = [];
+      if (invoice) parts.push(`Invoice contains "${invoice}"`);
+      if (amount)  parts.push(`Amount = $${amount}`);
+      if (month)   parts.push(MONTHS[parseInt(month)-1]);
+      if (year)    parts.push(year);
+      const label = parts.join(" | ");
+      countEl.textContent = `Showing ${filtered.length} record${filtered.length!==1?"s":""} — ${label}`;
     } else {
       countEl.textContent = "";
     }
@@ -502,16 +543,27 @@
 
   // ── Clear filter ─────────────────────────────────────────────
   window.clearFilter = () => {
-    document.getElementById("filter-month").value = "";
-    document.getElementById("filter-year").value  = "";
+    document.getElementById("filter-invoice").value = "";
+    document.getElementById("filter-amount").value  = "";
+    document.getElementById("filter-month").value   = "";
+    document.getElementById("filter-year").value    = "";
     applyFilter();
   };
+
+  // ── Check for duplicate invoice ──────────────────────────────
+  async function checkDuplicate(invoiceNum) {
+    if (!invoiceNum.trim()) return null;
+    const duplicate = allRecords.find(r =>
+      r.invoiceNum && r.invoiceNum.toLowerCase() === invoiceNum.toLowerCase()
+    );
+    return duplicate || null;
+  }
 
   // ── Render table ────────────────────────────────────────────
   function renderTable(records) {
     const tbody = document.getElementById("log-body");
     if (!records.length) {
-      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="icon">📋</div>No records yet — add one above.</div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="icon">📋</div>No records match your filters.</div></td></tr>`;
       return;
     }
     tbody.innerHTML = records.map(r => `
@@ -550,8 +602,37 @@
     const status   = document.getElementById("f-status").value;
     const note     = document.getElementById("f-note").value.trim();
 
-    if (!vendor) { alert("Vendor name is required."); return; }
+    if (!vendor) {
+      alert("Vendor name is required.");
+      return;
+    }
 
+    // ── Check for duplicate invoice ──────────────────────────
+    if (invoice) {
+      const duplicate = await checkDuplicate(invoice);
+      if (duplicate) {
+        const alertBox = document.getElementById("duplicate-alert");
+        alertBox.innerHTML = `
+          <div class="alert">
+            <strong>⚠️ Duplicate Invoice Detected!</strong><br/>
+            Invoice <strong>${esc(invoice)}</strong> already exists (added by ${esc(duplicate.vendorName)}).
+            <br/><br/>
+            <button class="btn-primary" style="margin-top: 8px;" onclick="window._proceedAnyway()">
+              Continue Anyway
+            </button>
+            <button class="btn-cancel" style="margin-left: 8px;" onclick="window._cancelAdd()">
+              Cancel
+            </button>
+          </div>
+        `;
+        window._pendingRecord = {
+          vendor, invoice, amount, received, uploaded, status, note
+        };
+        return;
+      }
+    }
+
+    // ── Save record ──────────────────────────────────────────
     await addDoc(col, {
       vendorName:   vendor,
       invoiceNum:   invoice,
@@ -563,9 +644,41 @@
       createdAt:    Date.now()
     });
 
+    // ── Clear form ───────────────────────────────────────────
     ["f-vendor","f-invoice","f-amount","f-received","f-uploaded","f-note"]
       .forEach(id => document.getElementById(id).value = "");
     document.getElementById("f-status").value = "";
+    document.getElementById("duplicate-alert").innerHTML = "";
+    window._pendingRecord = null;
+  };
+
+  // ── Proceed with duplicate ───────────────────────────────────
+  window._proceedAnyway = async () => {
+    const rec = window._pendingRecord;
+    if (!rec) return;
+
+    await addDoc(col, {
+      vendorName:   rec.vendor,
+      invoiceNum:   rec.invoice,
+      amount:       rec.amount ? parseFloat(rec.amount) : null,
+      dateReceived: rec.received,
+      dateUploaded: rec.uploaded,
+      status:       rec.status || "pending",
+      note:         rec.note,
+      createdAt:    Date.now()
+    });
+
+    ["f-vendor","f-invoice","f-amount","f-received","f-uploaded","f-note"]
+      .forEach(id => document.getElementById(id).value = "");
+    document.getElementById("f-status").value = "";
+    document.getElementById("duplicate-alert").innerHTML = "";
+    window._pendingRecord = null;
+  };
+
+  // ── Cancel add ───────────────────────────────────────────────
+  window._cancelAdd = () => {
+    document.getElementById("duplicate-alert").innerHTML = "";
+    window._pendingRecord = null;
   };
 
   // ── Delete ──────────────────────────────────────────────────
