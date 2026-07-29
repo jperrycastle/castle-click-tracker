@@ -378,7 +378,6 @@
       </select>
       <button class="btn-clear" onclick="clearFilter()">Clear Filter</button>
       <button class="btn-export" onclick="exportToExcel()">📊 Export to Excel</button>
-      <button class="btn-clear" onclick="setAllUploadedYes()">✅ Set All to Yes</button>
       <span class="filter-count" id="filter-count"></span>
     </div>
     <div class="table-wrap">
@@ -767,28 +766,6 @@
     const [cls, label] = map[status];
     return `<span class="badge ${cls}">${label}</span>`;
   }
-
-  // ── Bulk set all records' Upload Status to Yes ──────────────────
-  window.setAllUploadedYes = async () => {
-    if (!allRecords.length) {
-      alert("No records to update.");
-      return;
-    }
-
-    if (!confirm(`This will set "Uploaded Successfully?" to Yes for ALL ${allRecords.length} record(s). Continue?`)) {
-      return;
-    }
-
-    let updated = 0;
-    for (const r of allRecords) {
-      await updateDoc(doc(db, "uploads", r.id), {
-        uploadStatus: "yes"
-      });
-      updated++;
-    }
-
-    alert(`Done! Updated ${updated} record(s) to Yes.`);
-  };
 
   // ── Export to Excel ───────────────────────────────────────────
   window.exportToExcel = () => {
