@@ -378,7 +378,7 @@
       </select>
       <button class="btn-clear" onclick="clearFilter()">Clear Filter</button>
       <button class="btn-export" onclick="exportToExcel()">📊 Export to Excel</button>
-      <button class="btn-clear" onclick="fixOldRecords()">🔧 Fix Old Records</button>
+      <button class="btn-clear" onclick="setAllUploadedYes()">✅ Set All to Yes</button>
       <span class="filter-count" id="filter-count"></span>
     </div>
     <div class="table-wrap">
@@ -768,28 +768,26 @@
     return `<span class="badge ${cls}">${label}</span>`;
   }
 
-  // ── Fix old records missing uploadStatus (one-time migration) ──
-  window.fixOldRecords = async () => {
-    const needsFix = allRecords.filter(r => r.uploadStatus === undefined && r.status !== undefined);
-
-    if (!needsFix.length) {
-      alert("No old records found that need fixing. Everything looks up to date.");
+  // ── Bulk set all records' Upload Status to Yes ──────────────────
+  window.setAllUploadedYes = async () => {
+    if (!allRecords.length) {
+      alert("No records to update.");
       return;
     }
 
-    if (!confirm(`Found ${needsFix.length} old record(s) with a legacy status. Copy their value into "Uploaded Successfully?" now?`)) {
+    if (!confirm(`This will set "Uploaded Successfully?" to Yes for ALL ${allRecords.length} record(s). Continue?`)) {
       return;
     }
 
-    let fixed = 0;
-    for (const r of needsFix) {
+    let updated = 0;
+    for (const r of allRecords) {
       await updateDoc(doc(db, "uploads", r.id), {
-        uploadStatus: r.status
+        uploadStatus: "yes"
       });
-      fixed++;
+      updated++;
     }
 
-    alert(`Done! Updated ${fixed} record(s).`);
+    alert(`Done! Updated ${updated} record(s) to Yes.`);
   };
 
   // ── Export to Excel ───────────────────────────────────────────
