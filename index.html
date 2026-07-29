@@ -186,7 +186,15 @@
     .badge-yes     { background: #e6f4ec; color: var(--green); border: 1px solid #b7dfc6; }
     .badge-no      { background: #fdecea; color: var(--red);   border: 1px solid #f5c0bb; }
     .badge-pending { background: #fef3dc; color: var(--yellow); border: 1px solid #f5dfa0; }
-    .badge-duplicate { background: #ffe6e6; color: var(--red); border: 1px solid #ffb3b3; }
+    .badge-inv-inprocess      { background: #eef1fb; color: #3a5bc7; border: 1px solid #c7d0f0; }
+    .badge-inv-pendingapproval{ background: #fef3dc; color: var(--yellow); border: 1px solid #f5dfa0; }
+    .badge-inv-qualitycheck   { background: #f3e8fd; color: #7e3fc4; border: 1px solid #dcc3f5; }
+    .badge-inv-exported       { background: #e6f4ec; color: var(--green); border: 1px solid #b7dfc6; }
+
+    .btn-export {
+      background: #1a7a3c;
+      color: #fff;
+    }
 
     /* ── Row actions ── */
     .row-actions { display: flex; gap: 6px; }
@@ -235,8 +243,13 @@
       margin-bottom: 16px;
       flex-wrap: wrap;
     }
-    .filter-bar label { margin-bottom: 0; white-space: nowrap; font-size: .75rem; }
-    .filter-bar select { width: auto; min-width: 100px; }
+    .filter-bar label { margin-bottom: 0; white-space: nowrap; }
+    .filter-bar select { width: auto; min-width: 150px; }
+    .filter-bar input[type="text"],
+    .filter-bar input[type="number"] {
+      width: auto;
+      min-width: 150px;
+    }
     .btn-clear {
       background: #e8e8e8;
       color: var(--muted);
@@ -251,7 +264,7 @@
       font-style: italic;
     }
 
-    /* ── Alert box ── */
+    /* ── Duplicate alert ── */
     .alert {
       background: #ffe6e6;
       border: 1px solid #ffb3b3;
@@ -261,14 +274,13 @@
       margin-bottom: 12px;
       font-size: .85rem;
     }
-    .alert strong { font-weight: 700; }
 
     @media (max-width: 600px) {
       header, .stats, .main { padding-left: 16px; padding-right: 16px; }
       .form-grid { grid-template-columns: 1fr; }
-      .filter-bar { gap: 8px; font-size: .75rem; }
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -277,25 +289,6 @@
   <div class="brand-sub">Upload Tracker</div>
   <div class="brand-tag">Internal Use Only</div>
 </header>
-
-<div class="stats">
-  <div class="stat">
-    <div class="stat-label">Total</div>
-    <div class="stat-value gold" id="stat-total">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">Success</div>
-    <div class="stat-value green" id="stat-yes">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">Failed</div>
-    <div class="stat-value red" id="stat-no">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">Pending</div>
-    <div class="stat-value yellow" id="stat-pending">—</div>
-  </div>
-</div>
 
 <div class="main">
 
@@ -325,12 +318,22 @@
         <input id="f-uploaded" type="date" />
       </div>
       <div>
-        <label>Upload Successful?</label>
-        <select id="f-status">
+        <label>Uploaded Successfully?</label>
+        <select id="f-upload-status">
           <option value="">— Select —</option>
           <option value="yes">✅ Yes</option>
           <option value="no">❌ No</option>
           <option value="pending">⏳ Pending</option>
+        </select>
+      </div>
+      <div>
+        <label>Invoice Status</label>
+        <select id="f-invoice-status">
+          <option value="">— Select —</option>
+          <option value="inprocess">In Process</option>
+          <option value="pendingapproval">Pending Approval</option>
+          <option value="qualitycheck">Quality Check</option>
+          <option value="exported">Exported</option>
         </select>
       </div>
       <div class="form-full">
@@ -348,17 +351,18 @@
     <div class="card-title">// Upload Log</div>
     <!-- Filter bar -->
     <div class="filter-bar">
-      <input id="filter-invoice" type="text" placeholder="Search invoice #…" onkeyup="applyFilter()" style="width: 140px;" />
-      <input id="filter-amount" type="number" placeholder="Amount ($)" onkeyup="applyFilter()" style="width: 110px;" step="0.01" min="0" />
-      <label>Month:</label>
+      <input id="filter-vendor" type="text" placeholder="Search vendor…" onkeyup="applyFilter()" />
+      <input id="filter-invoice" type="text" placeholder="Search invoice #…" onkeyup="applyFilter()" />
+      <input id="filter-amount" type="number" placeholder="Amount ($)" step="0.01" min="0" onkeyup="applyFilter()" />
+      <label>Filter by Month:</label>
       <select id="filter-month" onchange="applyFilter()">
-        <option value="">— All —</option>
+        <option value="">— All Months —</option>
       </select>
-      <label style="margin-left: 10px;">Year:</label>
       <select id="filter-year" onchange="applyFilter()">
-        <option value="">— All —</option>
+        <option value="">— All Years —</option>
       </select>
-      <button class="btn-clear" onclick="clearFilter()">Clear All</button>
+      <button class="btn-clear" onclick="clearFilter()">Clear Filter</button>
+      <button class="btn-export" onclick="exportToExcel()">📊 Export to Excel</button>
       <span class="filter-count" id="filter-count"></span>
     </div>
     <div class="table-wrap">
@@ -370,13 +374,14 @@
             <th>Amount</th>
             <th>Received</th>
             <th>Uploaded</th>
-            <th>Status</th>
+            <th>Upload Status</th>
+            <th>Invoice Status</th>
             <th>Note</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody id="log-body">
-          <tr><td colspan="8"><div class="empty"><div class="icon">📋</div>Loading records…</div></td></tr>
+          <tr><td colspan="9"><div class="empty"><div class="icon">📋</div>Loading records…</div></td></tr>
         </tbody>
       </table>
     </div>
@@ -410,12 +415,22 @@
         <input id="e-uploaded" type="date" />
       </div>
       <div>
-        <label>Upload Successful?</label>
-        <select id="e-status">
+        <label>Uploaded Successfully?</label>
+        <select id="e-upload-status">
           <option value="">— Select —</option>
           <option value="yes">✅ Yes</option>
           <option value="no">❌ No</option>
           <option value="pending">⏳ Pending</option>
+        </select>
+      </div>
+      <div>
+        <label>Invoice Status</label>
+        <select id="e-invoice-status">
+          <option value="">— Select —</option>
+          <option value="inprocess">In Process</option>
+          <option value="pendingapproval">Pending Approval</option>
+          <option value="qualitycheck">Quality Check</option>
+          <option value="exported">Exported</option>
         </select>
       </div>
       <div class="form-full">
@@ -434,7 +449,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
   import {
     getFirestore, collection, addDoc, getDocs,
-    doc, deleteDoc, updateDoc, onSnapshot, orderBy, query, where
+    doc, deleteDoc, updateDoc, onSnapshot, orderBy, query
   } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -491,27 +506,27 @@
 
   // ── Apply filter ─────────────────────────────────────────────
   window.applyFilter = () => {
-    const month    = document.getElementById("filter-month").value;
-    const year     = document.getElementById("filter-year").value;
-    const invoice  = document.getElementById("filter-invoice").value.trim().toLowerCase();
-    const amount   = document.getElementById("filter-amount").value.trim();
+    const month   = document.getElementById("filter-month").value;
+    const year    = document.getElementById("filter-year").value;
+    const vendor  = document.getElementById("filter-vendor").value.trim().toLowerCase();
+    const invoice = document.getElementById("filter-invoice").value.trim().toLowerCase();
+    const amount  = document.getElementById("filter-amount").value.trim();
 
     let filtered = allRecords;
 
-    // Filter by invoice number
-    if (invoice) {
-      filtered = filtered.filter(r =>
-        (r.invoiceNum || "").toLowerCase().includes(invoice)
-      );
+    if (vendor) {
+      filtered = filtered.filter(r => (r.vendorName || "").toLowerCase().includes(vendor));
     }
 
-    // Filter by amount
+    if (invoice) {
+      filtered = filtered.filter(r => (r.invoiceNum || "").toLowerCase().includes(invoice));
+    }
+
     if (amount) {
       const searchAmount = parseFloat(amount);
       filtered = filtered.filter(r => r.amount === searchAmount);
     }
 
-    // Filter by month/year
     if (month || year) {
       filtered = filtered.filter(r => {
         const d = r.dateReceived || r.dateUploaded || "";
@@ -524,18 +539,12 @@
     }
 
     renderTable(filtered);
-    renderStats(filtered);
 
     const countEl = document.getElementById("filter-count");
-    const hasFilters = invoice || amount || month || year;
-    if (hasFilters) {
-      let parts = [];
-      if (invoice) parts.push(`Invoice contains "${invoice}"`);
-      if (amount)  parts.push(`Amount = $${amount}`);
-      if (month)   parts.push(MONTHS[parseInt(month)-1]);
-      if (year)    parts.push(year);
-      const label = parts.join(" | ");
-      countEl.textContent = `Showing ${filtered.length} record${filtered.length!==1?"s":""} — ${label}`;
+    if (month || year || vendor || invoice || amount) {
+      const mName = month ? MONTHS[parseInt(month)-1] : "";
+      const label = [vendor, invoice, amount ? "$"+amount : "", mName, year].filter(Boolean).join(" · ");
+      countEl.textContent = `Showing ${filtered.length} record${filtered.length!==1?"s":""}${label ? " — "+label : ""}`;
     } else {
       countEl.textContent = "";
     }
@@ -543,6 +552,7 @@
 
   // ── Clear filter ─────────────────────────────────────────────
   window.clearFilter = () => {
+    document.getElementById("filter-vendor").value  = "";
     document.getElementById("filter-invoice").value = "";
     document.getElementById("filter-amount").value  = "";
     document.getElementById("filter-month").value   = "";
@@ -550,20 +560,11 @@
     applyFilter();
   };
 
-  // ── Check for duplicate invoice ──────────────────────────────
-  async function checkDuplicate(invoiceNum) {
-    if (!invoiceNum.trim()) return null;
-    const duplicate = allRecords.find(r =>
-      r.invoiceNum && r.invoiceNum.toLowerCase() === invoiceNum.toLowerCase()
-    );
-    return duplicate || null;
-  }
-
   // ── Render table ────────────────────────────────────────────
   function renderTable(records) {
     const tbody = document.getElementById("log-body");
     if (!records.length) {
-      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="icon">📋</div>No records match your filters.</div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="icon">📋</div>No records yet — add one above.</div></td></tr>`;
       return;
     }
     tbody.innerHTML = records.map(r => `
@@ -573,7 +574,8 @@
         <td class="td-amount">${r.amount != null ? "$" + Number(r.amount).toFixed(2) : "—"}</td>
         <td>${fmt(r.dateReceived)}</td>
         <td>${fmt(r.dateUploaded)}</td>
-        <td>${badge(r.status)}</td>
+        <td>${badge(r.uploadStatus)}</td>
+        <td>${invoiceBadge(r.invoiceStatus)}</td>
         <td class="td-note">${esc(r.note || "—")}</td>
         <td>
           <div class="row-actions">
@@ -584,98 +586,70 @@
       </tr>`).join("");
   }
 
-  // ── Stats ───────────────────────────────────────────────────
-  function renderStats(records) {
-    document.getElementById("stat-total").textContent   = records.length;
-    document.getElementById("stat-yes").textContent     = records.filter(r => r.status === "yes").length;
-    document.getElementById("stat-no").textContent      = records.filter(r => r.status === "no").length;
-    document.getElementById("stat-pending").textContent = records.filter(r => r.status === "pending" || !r.status).length;
+  // ── Duplicate check ───────────────────────────────────────────
+  function findDuplicate(invoiceNum) {
+    if (!invoiceNum.trim()) return null;
+    return allRecords.find(r => r.invoiceNum && r.invoiceNum.toLowerCase() === invoiceNum.toLowerCase()) || null;
   }
 
   // ── Add ─────────────────────────────────────────────────────
   window.addRecord = async () => {
-    const vendor   = document.getElementById("f-vendor").value.trim();
-    const invoice  = document.getElementById("f-invoice").value.trim();
-    const amount   = document.getElementById("f-amount").value;
-    const received = document.getElementById("f-received").value;
-    const uploaded = document.getElementById("f-uploaded").value;
-    const status   = document.getElementById("f-status").value;
-    const note     = document.getElementById("f-note").value.trim();
+    const vendor         = document.getElementById("f-vendor").value.trim();
+    const invoice        = document.getElementById("f-invoice").value.trim();
+    const amount         = document.getElementById("f-amount").value;
+    const received       = document.getElementById("f-received").value;
+    const uploaded        = document.getElementById("f-uploaded").value;
+    const uploadStatus    = document.getElementById("f-upload-status").value;
+    const invoiceStatus   = document.getElementById("f-invoice-status").value;
+    const note            = document.getElementById("f-note").value.trim();
 
-    if (!vendor) {
-      alert("Vendor name is required.");
-      return;
-    }
+    if (!vendor) { alert("Vendor name is required."); return; }
 
-    // ── Check for duplicate invoice ──────────────────────────
     if (invoice) {
-      const duplicate = await checkDuplicate(invoice);
+      const duplicate = findDuplicate(invoice);
       if (duplicate) {
-        const alertBox = document.getElementById("duplicate-alert");
-        alertBox.innerHTML = `
+        document.getElementById("duplicate-alert").innerHTML = `
           <div class="alert">
-            <strong>⚠️ Duplicate Invoice Detected!</strong><br/>
-            Invoice <strong>${esc(invoice)}</strong> already exists (added by ${esc(duplicate.vendorName)}).
-            <br/><br/>
-            <button class="btn-primary" style="margin-top: 8px;" onclick="window._proceedAnyway()">
-              Continue Anyway
-            </button>
-            <button class="btn-cancel" style="margin-left: 8px;" onclick="window._cancelAdd()">
-              Cancel
-            </button>
-          </div>
-        `;
-        window._pendingRecord = {
-          vendor, invoice, amount, received, uploaded, status, note
-        };
+            ⚠️ <strong>Duplicate Invoice:</strong> "${esc(invoice)}" already exists for <strong>${esc(duplicate.vendorName)}</strong>.
+            <div style="margin-top:8px; display:flex; gap:8px;">
+              <button class="btn-primary" onclick="window._proceedAnyway()">Add Anyway</button>
+              <button class="btn-cancel" onclick="window._cancelAdd()">Cancel</button>
+            </div>
+          </div>`;
+        window._pendingRecord = { vendor, invoice, amount, received, uploaded, uploadStatus, invoiceStatus, note };
         return;
       }
     }
 
-    // ── Save record ──────────────────────────────────────────
-    await addDoc(col, {
-      vendorName:   vendor,
-      invoiceNum:   invoice,
-      amount:       amount ? parseFloat(amount) : null,
-      dateReceived: received,
-      dateUploaded: uploaded,
-      status:       status || "pending",
-      note:         note,
-      createdAt:    Date.now()
-    });
-
-    // ── Clear form ───────────────────────────────────────────
-    ["f-vendor","f-invoice","f-amount","f-received","f-uploaded","f-note"]
-      .forEach(id => document.getElementById(id).value = "");
-    document.getElementById("f-status").value = "";
-    document.getElementById("duplicate-alert").innerHTML = "";
-    window._pendingRecord = null;
+    await saveNewRecord({ vendor, invoice, amount, received, uploaded, uploadStatus, invoiceStatus, note });
   };
 
-  // ── Proceed with duplicate ───────────────────────────────────
+  async function saveNewRecord(rec) {
+    await addDoc(col, {
+      vendorName:     rec.vendor,
+      invoiceNum:     rec.invoice,
+      amount:         rec.amount ? parseFloat(rec.amount) : null,
+      dateReceived:   rec.received,
+      dateUploaded:   rec.uploaded,
+      uploadStatus:   rec.uploadStatus || "pending",
+      invoiceStatus:  rec.invoiceStatus || "",
+      note:           rec.note,
+      createdAt:      Date.now()
+    });
+
+    ["f-vendor","f-invoice","f-amount","f-received","f-uploaded","f-note"]
+      .forEach(id => document.getElementById(id).value = "");
+    document.getElementById("f-upload-status").value = "";
+    document.getElementById("f-invoice-status").value = "";
+    document.getElementById("duplicate-alert").innerHTML = "";
+    window._pendingRecord = null;
+  }
+
   window._proceedAnyway = async () => {
-    const rec = window._pendingRecord;
-    if (!rec) return;
-
-    await addDoc(col, {
-      vendorName:   rec.vendor,
-      invoiceNum:   rec.invoice,
-      amount:       rec.amount ? parseFloat(rec.amount) : null,
-      dateReceived: rec.received,
-      dateUploaded: rec.uploaded,
-      status:       rec.status || "pending",
-      note:         rec.note,
-      createdAt:    Date.now()
-    });
-
-    ["f-vendor","f-invoice","f-amount","f-received","f-uploaded","f-note"]
-      .forEach(id => document.getElementById(id).value = "");
-    document.getElementById("f-status").value = "";
-    document.getElementById("duplicate-alert").innerHTML = "";
-    window._pendingRecord = null;
+    if (!window._pendingRecord) return;
+    await saveNewRecord(window._pendingRecord);
   };
 
-  // ── Cancel add ───────────────────────────────────────────────
   window._cancelAdd = () => {
     document.getElementById("duplicate-alert").innerHTML = "";
     window._pendingRecord = null;
@@ -695,13 +669,14 @@
     const r = record.data();
 
     editingId = id;
-    document.getElementById("e-vendor").value   = r.vendorName    || "";
-    document.getElementById("e-invoice").value  = r.invoiceNum    || "";
-    document.getElementById("e-amount").value   = r.amount != null ? r.amount : "";
-    document.getElementById("e-received").value = r.dateReceived  || "";
-    document.getElementById("e-uploaded").value = r.dateUploaded  || "";
-    document.getElementById("e-status").value   = r.status        || "";
-    document.getElementById("e-note").value     = r.note          || "";
+    document.getElementById("e-vendor").value          = r.vendorName     || "";
+    document.getElementById("e-invoice").value         = r.invoiceNum     || "";
+    document.getElementById("e-amount").value          = r.amount != null ? r.amount : "";
+    document.getElementById("e-received").value        = r.dateReceived   || "";
+    document.getElementById("e-uploaded").value        = r.dateUploaded   || "";
+    document.getElementById("e-upload-status").value   = r.uploadStatus   || "";
+    document.getElementById("e-invoice-status").value  = r.invoiceStatus  || "";
+    document.getElementById("e-note").value            = r.note           || "";
 
     document.getElementById("edit-modal").classList.add("open");
   };
@@ -712,13 +687,14 @@
     const amount = document.getElementById("e-amount").value;
 
     await updateDoc(doc(db, "uploads", editingId), {
-      vendorName:   document.getElementById("e-vendor").value.trim(),
-      invoiceNum:   document.getElementById("e-invoice").value.trim(),
-      amount:       amount ? parseFloat(amount) : null,
-      dateReceived: document.getElementById("e-received").value,
-      dateUploaded: document.getElementById("e-uploaded").value,
-      status:       document.getElementById("e-status").value || "pending",
-      note:         document.getElementById("e-note").value.trim(),
+      vendorName:     document.getElementById("e-vendor").value.trim(),
+      invoiceNum:     document.getElementById("e-invoice").value.trim(),
+      amount:         amount ? parseFloat(amount) : null,
+      dateReceived:   document.getElementById("e-received").value,
+      dateUploaded:   document.getElementById("e-uploaded").value,
+      uploadStatus:   document.getElementById("e-upload-status").value || "pending",
+      invoiceStatus:  document.getElementById("e-invoice-status").value || "",
+      note:           document.getElementById("e-note").value.trim(),
     });
 
     closeModal();
@@ -752,6 +728,46 @@
     const [cls, label] = map[status] || map.pending;
     return `<span class="badge ${cls}">${label}</span>`;
   }
+  function invoiceBadge(status) {
+    const map = {
+      inprocess:        ["badge-inv-inprocess",        "In Process"],
+      pendingapproval:  ["badge-inv-pendingapproval",  "Pending Approval"],
+      qualitycheck:     ["badge-inv-qualitycheck",     "Quality Check"],
+      exported:         ["badge-inv-exported",         "Exported"],
+    };
+    if (!status || !map[status]) return "—";
+    const [cls, label] = map[status];
+    return `<span class="badge ${cls}">${label}</span>`;
+  }
+
+  // ── Export to Excel ───────────────────────────────────────────
+  window.exportToExcel = () => {
+    const invStatusLabels = {
+      inprocess: "In Process",
+      pendingapproval: "Pending Approval",
+      qualitycheck: "Quality Check",
+      exported: "Exported"
+    };
+    const uploadStatusLabels = { yes: "Yes", no: "No", pending: "Pending" };
+
+    const rows = allRecords.map(r => ({
+      "Vendor":          r.vendorName || "",
+      "Invoice #":       r.invoiceNum || "",
+      "Amount":          r.amount != null ? Number(r.amount) : "",
+      "Date Received":   r.dateReceived || "",
+      "Date Uploaded":   r.dateUploaded || "",
+      "Upload Status":   uploadStatusLabels[r.uploadStatus] || "",
+      "Invoice Status":  invStatusLabels[r.invoiceStatus] || "",
+      "Note":            r.note || ""
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Uploads");
+
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `CastleDrop_Uploads_${today}.xlsx`);
+  };
 </script>
 </body>
 </html>
