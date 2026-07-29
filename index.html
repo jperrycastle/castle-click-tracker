@@ -361,8 +361,24 @@
       <select id="filter-year" onchange="applyFilter()">
         <option value="">— All Years —</option>
       </select>
+      <label>Upload Status:</label>
+      <select id="filter-upload-status" onchange="applyFilter()">
+        <option value="">— All —</option>
+        <option value="yes">✅ Yes</option>
+        <option value="no">❌ No</option>
+        <option value="pending">⏳ Pending</option>
+      </select>
+      <label>Invoice Status:</label>
+      <select id="filter-invoice-status" onchange="applyFilter()">
+        <option value="">— All —</option>
+        <option value="inprocess">In Process</option>
+        <option value="pendingapproval">Pending Approval</option>
+        <option value="qualitycheck">Quality Check</option>
+        <option value="exported">Exported</option>
+      </select>
       <button class="btn-clear" onclick="clearFilter()">Clear Filter</button>
       <button class="btn-export" onclick="exportToExcel()">📊 Export to Excel</button>
+      <button class="btn-clear" onclick="fixOldRecords()">🔧 Fix Old Records</button>
       <span class="filter-count" id="filter-count"></span>
     </div>
     <div class="table-wrap">
@@ -506,11 +522,13 @@
 
   // ── Apply filter ─────────────────────────────────────────────
   window.applyFilter = () => {
-    const month   = document.getElementById("filter-month").value;
-    const year    = document.getElementById("filter-year").value;
-    const vendor  = document.getElementById("filter-vendor").value.trim().toLowerCase();
-    const invoice = document.getElementById("filter-invoice").value.trim().toLowerCase();
-    const amount  = document.getElementById("filter-amount").value.trim();
+    const month          = document.getElementById("filter-month").value;
+    const year           = document.getElementById("filter-year").value;
+    const vendor         = document.getElementById("filter-vendor").value.trim().toLowerCase();
+    const invoice        = document.getElementById("filter-invoice").value.trim().toLowerCase();
+    const amount         = document.getElementById("filter-amount").value.trim();
+    const uploadStatus   = document.getElementById("filter-upload-status").value;
+    const invoiceStatus  = document.getElementById("filter-invoice-status").value;
 
     let filtered = allRecords;
 
@@ -527,6 +545,14 @@
       filtered = filtered.filter(r => r.amount === searchAmount);
     }
 
+    if (uploadStatus) {
+      filtered = filtered.filter(r => (r.uploadStatus || "pending") === uploadStatus);
+    }
+
+    if (invoiceStatus) {
+      filtered = filtered.filter(r => r.invoiceStatus === invoiceStatus);
+    }
+
     if (month || year) {
       filtered = filtered.filter(r => {
         const d = r.dateReceived || r.dateUploaded || "";
@@ -538,12 +564,12 @@
       });
     }
 
-    renderTable(filtered);
+    renderTable(filtered, !!vendor);
 
     const countEl = document.getElementById("filter-count");
-    if (month || year || vendor || invoice || amount) {
+    if (month || year || vendor || invoice || amount || uploadStatus || invoiceStatus) {
       const mName = month ? MONTHS[parseInt(month)-1] : "";
-      const label = [vendor, invoice, amount ? "$"+amount : "", mName, year].filter(Boolean).join(" · ");
+      const label = [vendor, invoice, amount ? "$"+amount : "", mName, year, uploadStatus, invoiceStatus].filter(Boolean).join(" · ");
       countEl.textContent = `Showing ${filtered.length} record${filtered.length!==1?"s":""}${label ? " — "+label : ""}`;
     } else {
       countEl.textContent = "";
@@ -552,16 +578,18 @@
 
   // ── Clear filter ─────────────────────────────────────────────
   window.clearFilter = () => {
-    document.getElementById("filter-vendor").value  = "";
-    document.getElementById("filter-invoice").value = "";
-    document.getElementById("filter-amount").value  = "";
-    document.getElementById("filter-month").value   = "";
-    document.getElementById("filter-year").value    = "";
+    document.getElementById("filter-vendor").value          = "";
+    document.getElementById("filter-invoice").value         = "";
+    document.getElementById("filter-amount").value           = "";
+    document.getElementById("filter-month").value            = "";
+    document.getElementById("filter-year").value             = "";
+    document.getElementById("filter-upload-status").value    = "";
+    document.getElementById("filter-invoice-status").value   = "";
     applyFilter();
   };
 
   // ── Render table ────────────────────────────────────────────
-  function renderTable(records) {
+  function renderTable(records, showVendor) {
     const tbody = document.getElementById("log-body");
     if (!records.length) {
       tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="icon">📋</div>No records yet — add one above.</div></td></tr>`;
@@ -569,7 +597,7 @@
     }
     tbody.innerHTML = records.map(r => `
       <tr>
-        <td class="td-vendor">${esc(r.vendorName)}</td>
+        <td class="td-vendor">${showVendor ? esc(r.vendorName || "—") : ""}</td>
         <td>${esc(r.invoiceNum || "—")}</td>
         <td class="td-amount">${r.amount != null ? "$" + Number(r.amount).toFixed(2) : "—"}</td>
         <td>${fmt(r.dateReceived)}</td>
@@ -739,6 +767,30 @@
     const [cls, label] = map[status];
     return `<span class="badge ${cls}">${label}</span>`;
   }
+
+  // ── Fix old records missing uploadStatus (one-time migration) ──
+  window.fixOldRecords = async () => {
+    const needsFix = allRecords.filter(r => r.uploadStatus === undefined && r.status !== undefined);
+
+    if (!needsFix.length) {
+      alert("No old records found that need fixing. Everything looks up to date.");
+      return;
+    }
+
+    if (!confirm(`Found ${needsFix.length} old record(s) with a legacy status. Copy their value into "Uploaded Successfully?" now?`)) {
+      return;
+    }
+
+    let fixed = 0;
+    for (const r of needsFix) {
+      await updateDoc(doc(db, "uploads", r.id), {
+        uploadStatus: r.status
+      });
+      fixed++;
+    }
+
+    alert(`Done! Updated ${fixed} record(s).`);
+  };
 
   // ── Export to Excel ───────────────────────────────────────────
   window.exportToExcel = () => {
